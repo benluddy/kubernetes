@@ -17,10 +17,8 @@ limitations under the License.
 package httplog
 
 import (
-	"bufio"
 	"context"
 	"fmt"
-	"net"
 	"net/http"
 	"runtime"
 	"strings"
@@ -307,12 +305,8 @@ func (rl *respLogger) WriteHeader(status int) {
 	rl.w.WriteHeader(status)
 }
 
-func (rl *respLogger) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+func (rl *respLogger) Hijacked(_ int) {
 	rl.hijacked = true
-
-	// the outer ResponseWriter object returned by WrapForHTTP1Or2 implements
-	// http.Hijacker if the inner object (rl.w) implements http.Hijacker.
-	return rl.w.(http.Hijacker).Hijack()
 }
 
 func (rl *respLogger) recordStatus(status int) {

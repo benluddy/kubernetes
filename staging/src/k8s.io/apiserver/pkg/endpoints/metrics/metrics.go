@@ -638,6 +638,10 @@ func (r *ResponseWriterDelegator) Unwrap() http.ResponseWriter {
 	return r.ResponseWriter
 }
 
+func (r *ResponseWriterDelegator) Hijacked(status int) {
+	r.status = status // todo
+}
+
 func (r *ResponseWriterDelegator) WriteHeader(code int) {
 	r.status = code
 	r.wroteHeader = true

@@ -172,9 +172,38 @@ type outerWithCloseNotifyFlushAndHijack struct {
 }
 
 func (wr outerWithCloseNotifyFlushAndHijack) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	return wr.hijack(0)
+}
+
+func (wr outerWithCloseNotifyFlushAndHijack) hijack(status int) (net.Conn, *bufio.ReadWriter, error) {
+	if observer, ok := wr.UserProvidedDecorator.(HijackObserver); ok {
+		defer observer.Hijacked(status)
+	}
+
 	if hijacker, ok := wr.UserProvidedDecorator.(http.Hijacker); ok {
 		return hijacker.Hijack()
 	}
 
+	if innerOuter, ok := wr.InnerHijacker.(hijackerWrapper); ok {
+		return innerOuter.hijack(status)
+	}
+
 	return wr.InnerHijacker.Hijack()
+}
+
+type hijackerWrapper interface {
+	hijack(status int) (net.Conn, *bufio.ReadWriter, error)
+}
+
+// todo: invoked on UserProvidedDecorators that implement this immediately after hijacking
+type HijackObserver interface {
+	Hijacked(status int)
+}
+
+func HijackWithStatus(hijacker http.Hijacker, status int) (net.Conn, *bufio.ReadWriter, error) {
+	if outer, ok := hijacker.(hijackerWrapper); ok {
+		return outer.hijack(status)
+	}
+
+	return hijacker.Hijack()
 }

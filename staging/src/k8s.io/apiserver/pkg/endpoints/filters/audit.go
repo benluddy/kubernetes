@@ -17,11 +17,9 @@ limitations under the License.
 package filters
 
 import (
-	"bufio"
 	"context"
 	"errors"
 	"fmt"
-	"net"
 	"net/http"
 	"sync"
 	"time"
@@ -200,6 +198,10 @@ func (a *auditResponseWriter) Unwrap() http.ResponseWriter {
 	return a.ResponseWriter
 }
 
+func (a *auditResponseWriter) Hijacked(status int) {
+	a.processCode(status)
+}
+
 func (a *auditResponseWriter) processCode(code int) {
 	a.once.Do(func() {
 		if a.event.ResponseStatus == nil {
@@ -223,13 +225,4 @@ func (a *auditResponseWriter) Write(bs []byte) (int, error) {
 func (a *auditResponseWriter) WriteHeader(code int) {
 	a.processCode(code)
 	a.ResponseWriter.WriteHeader(code)
-}
-
-func (a *auditResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
-	// fake a response status before protocol switch happens
-	a.processCode(http.StatusSwitchingProtocols)
-
-	// the outer ResponseWriter object returned by WrapForHTTP1Or2 implements
-	// http.Hijacker if the inner object (a.ResponseWriter) implements http.Hijacker.
-	return a.ResponseWriter.(http.Hijacker).Hijack()
 }

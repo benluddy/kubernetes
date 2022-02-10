@@ -17,10 +17,8 @@ limitations under the License.
 package filters
 
 import (
-	"bufio"
 	"encoding/json"
 	"fmt"
-	"net"
 	"net/http"
 	"runtime"
 	"sync"
@@ -285,19 +283,8 @@ func (tw *baseTimeoutWriter) CloseNotify() <-chan bool {
 	return tw.w.(http.CloseNotifier).CloseNotify()
 }
 
-func (tw *baseTimeoutWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+func (tw *baseTimeoutWriter) Hijacked(_ int) {
 	tw.mu.Lock()
 	defer tw.mu.Unlock()
-
-	if tw.timedOut {
-		return nil, nil, http.ErrHandlerTimeout
-	}
-
-	// the outer ResponseWriter object returned by WrapForHTTP1Or2 implements
-	// http.Hijacker if the inner object (tw.w) implements http.Hijacker.
-	conn, rw, err := tw.w.(http.Hijacker).Hijack()
-	if err == nil {
-		tw.hijacked = true
-	}
-	return conn, rw, err
+	tw.hijacked = true
 }

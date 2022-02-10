@@ -37,6 +37,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 
 	"github.com/mxk/go-flowrate/flowrate"
+	"k8s.io/apiserver/pkg/endpoints/responsewriter"
 	"k8s.io/klog/v2"
 )
 
@@ -358,7 +359,7 @@ func (h *UpgradeAwareHandler) tryUpgrade(w http.ResponseWriter, req *http.Reques
 		h.Responder.Error(w, req, fmt.Errorf("request connection cannot be hijacked: %T", w))
 		return true
 	}
-	requestHijackedConn, _, err := requestHijacker.Hijack()
+	requestHijackedConn, _, err := responsewriter.HijackWithStatus(requestHijacker, backendHTTPResponse.StatusCode)
 	if err != nil {
 		klog.V(6).Infof("Unable to hijack response: %v", err)
 		h.Responder.Error(w, req, fmt.Errorf("error hijacking connection: %v", err))
