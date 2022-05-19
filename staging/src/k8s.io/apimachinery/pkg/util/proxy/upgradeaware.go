@@ -19,6 +19,7 @@ package proxy
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -348,6 +349,8 @@ func (h *UpgradeAwareHandler) tryUpgrade(w http.ResponseWriter, req *http.Reques
 		h.Responder.Error(w, req, fmt.Errorf("request connection cannot be hijacked: %T", w))
 		return true
 	}
+
+	notifyStatusObservers(req.Context(), backendHTTPResponse.StatusCode)
 	requestHijackedConn, _, err := requestHijacker.Hijack()
 	if err != nil {
 		klog.V(6).Infof("Unable to hijack response: %v", err)
@@ -527,4 +530,29 @@ func removeCORSHeaders(resp *http.Response) {
 	resp.Header.Del("Access-Control-Allow-Headers")
 	resp.Header.Del("Access-Control-Allow-Methods")
 	resp.Header.Del("Access-Control-Allow-Origin")
+}
+
+type statusObserversKeyType int
+
+const statusObserversKey statusObserversKeyType = iota
+
+type StatusObserver struct {
+	status int
+}
+
+func (observer StatusObserver) Status() int {
+	return observer.status
+}
+
+func AddStatusObserver(parent context.Context, toadd *StatusObserver) context.Context {
+	observers, _ := parent.Value(statusObserversKey).([]*StatusObserver)
+	observers = append(observers, toadd)
+	return context.WithValue(parent, statusObserversKey, observers)
+}
+
+func notifyStatusObservers(ctx context.Context, status int) {
+	observers, _ := ctx.Value(statusObserversKey).([]*StatusObserver)
+	for _, observer := range observers {
+		observer.status = status
+	}
 }

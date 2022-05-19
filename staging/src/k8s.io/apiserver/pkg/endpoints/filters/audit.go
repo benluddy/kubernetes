@@ -27,6 +27,7 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/proxy"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
 	"k8s.io/apiserver/pkg/audit"
@@ -221,11 +222,12 @@ var _ responsewriter.UserProvidedDecorator = &auditResponseWriter{}
 // create immediately an event (for long running requests).
 type auditResponseWriter struct {
 	http.ResponseWriter
-	ctx        context.Context
-	event      *auditinternal.Event
-	once       sync.Once
-	sink       audit.Sink
-	omitStages []auditinternal.Stage
+	ctx                 context.Context
+	event               *auditinternal.Event
+	once                sync.Once
+	sink                audit.Sink
+	omitStages          []auditinternal.Stage
+	proxyStatusObserver proxy.StatusObserver
 }
 
 func (a *auditResponseWriter) Unwrap() http.ResponseWriter {
@@ -258,8 +260,7 @@ func (a *auditResponseWriter) WriteHeader(code int) {
 }
 
 func (a *auditResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
-	// fake a response status before protocol switch happens
-	a.processCode(http.StatusSwitchingProtocols)
+	a.processCode(a.proxyStatusObserver.Status())
 
 	// the outer ResponseWriter object returned by WrapForHTTP1Or2 implements
 	// http.Hijacker if the inner object (a.ResponseWriter) implements http.Hijacker.

@@ -17,7 +17,9 @@ limitations under the License.
 package metrics
 
 import (
+	"bufio"
 	"context"
+	"net"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -28,6 +30,7 @@ import (
 	restful "github.com/emicklei/go-restful"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/proxy"
 	utilsets "k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/authentication/user"
@@ -548,7 +551,7 @@ func InstrumentRouteFunc(verb, group, version, resource, subresource, scope, com
 		}
 
 		delegate := &ResponseWriterDelegator{ResponseWriter: response.ResponseWriter}
-
+		req.Request = req.Request.WithContext(proxy.AddStatusObserver(req.Request.Context(), &delegate.proxyStatusObserver))
 		rw := responsewriter.WrapForHTTP1Or2(delegate)
 		response.ResponseWriter = rw
 
@@ -567,6 +570,7 @@ func InstrumentHandlerFunc(verb, group, version, resource, subresource, scope, c
 		}
 
 		delegate := &ResponseWriterDelegator{ResponseWriter: w}
+		req = req.WithContext(proxy.AddStatusObserver(req.Context(), &delegate.proxyStatusObserver))
 		w = responsewriter.WrapForHTTP1Or2(delegate)
 
 		handler(w, req)
@@ -690,9 +694,10 @@ var _ responsewriter.UserProvidedDecorator = (*ResponseWriterDelegator)(nil)
 type ResponseWriterDelegator struct {
 	http.ResponseWriter
 
-	status      int
-	written     int64
-	wroteHeader bool
+	status              int
+	written             int64
+	wroteHeader         bool
+	proxyStatusObserver proxy.StatusObserver
 }
 
 func (r *ResponseWriterDelegator) Unwrap() http.ResponseWriter {
@@ -720,6 +725,18 @@ func (r *ResponseWriterDelegator) Status() int {
 
 func (r *ResponseWriterDelegator) ContentLength() int {
 	return int(r.written)
+}
+
+func (r *ResponseWriterDelegator) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	if r.status == 0 {
+		// Proxied requests may have received a backend status
+		// but bypassed Write and WriteHeader.
+		r.status = r.proxyStatusObserver.Status()
+	}
+
+	// the outer ResponseWriter object returned by WrapForHTTP1Or2 implements
+	// http.Hijacker if the inner object (a.ResponseWriter) implements http.Hijacker.
+	return r.ResponseWriter.(http.Hijacker).Hijack()
 }
 
 // Small optimization over Itoa
