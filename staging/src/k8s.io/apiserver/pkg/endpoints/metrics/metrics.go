@@ -17,7 +17,9 @@ limitations under the License.
 package metrics
 
 import (
+	"bufio"
 	"context"
+	"net"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -712,6 +714,7 @@ type ResponseWriterDelegator struct {
 	status      int
 	written     int64
 	wroteHeader bool
+	skimmer     *responsewriter.Skimmer
 }
 
 func (r *ResponseWriterDelegator) Unwrap() http.ResponseWriter {
@@ -734,11 +737,27 @@ func (r *ResponseWriterDelegator) Write(b []byte) (int, error) {
 }
 
 func (r *ResponseWriterDelegator) Status() int {
+	if r.skimmer != nil {
+		if status, ok := r.skimmer.Status(); ok {
+			return status
+		}
+	}
 	return r.status
 }
 
 func (r *ResponseWriterDelegator) ContentLength() int {
 	return int(r.written)
+}
+
+func (r *ResponseWriterDelegator) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	// the outer ResponseWriter object returned by WrapForHTTP1Or2 implements
+	// http.Hijacker if the inner object (a.ResponseWriter) implements http.Hijacker.
+	conn, rw, err := r.ResponseWriter.(http.Hijacker).Hijack()
+	if r.wroteHeader {
+		return conn, rw, err
+	}
+	r.skimmer = responsewriter.Skim(conn)
+	return r.skimmer, rw, err
 }
 
 // Small optimization over Itoa
