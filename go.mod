@@ -46,6 +46,7 @@ require (
 	github.com/imdario/mergo v0.3.6
 	github.com/ishidawataru/sctp v0.0.0-20190723014705-7c296d48a2b5
 	github.com/libopenstorage/openstorage v1.0.0
+	github.com/linkedin/goavro/v2 v2.12.0
 	github.com/lithammer/dedent v1.1.0
 	github.com/moby/ipvs v1.1.0
 	github.com/mrunalp/fileutils v0.5.0
@@ -63,6 +64,7 @@ require (
 	github.com/spf13/cobra v1.7.0
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.8.2
+	github.com/ugorji/go v1.1.4
 	github.com/vishvananda/netlink v1.1.0
 	github.com/vmware/govmomi v0.30.0
 	go.etcd.io/etcd/api/v3 v3.5.9
@@ -173,6 +175,7 @@ require (
 	github.com/go-task/slim-sprig v0.0.0-20230315185526-52ccab3ef572 // indirect
 	github.com/gofrs/uuid v4.4.0+incompatible // indirect
 	github.com/golang-jwt/jwt/v4 v4.5.0 // indirect
+	github.com/golang/snappy v0.0.3 // indirect
 	github.com/google/btree v1.0.1 // indirect
 	github.com/google/pprof v0.0.0-20210720184732-4bb14d4b1be1 // indirect
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510 // indirect
@@ -248,6 +251,7 @@ require (
 )
 
 replace (
+	github.com/linkedin/goavro/v2 => github.com/benluddy/goavro/v2 v2.0.0-20230725222202-6537beecf5a0
 	k8s.io/api => ./staging/src/k8s.io/api
 	k8s.io/apiextensions-apiserver => ./staging/src/k8s.io/apiextensions-apiserver
 	k8s.io/apimachinery => ./staging/src/k8s.io/apimachinery
