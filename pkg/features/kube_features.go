@@ -21,6 +21,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/runtime"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	clientfeatures "k8s.io/client-go/features"
 	"k8s.io/component-base/featuregate"
 )
 
@@ -904,6 +905,14 @@ const (
 
 func init() {
 	runtime.Must(utilfeature.DefaultMutableFeatureGate.Add(defaultKubernetesFeatureGates))
+
+	// replace client-go's feature gate instance with kube's
+	ca := newClientAdapter[clientfeatures.Feature, clientfeatures.FeatureSpec](
+		utilfeature.DefaultMutableFeatureGate,
+		clientfeatures.Alpha, clientfeatures.Beta, clientfeatures.GA, clientfeatures.Deprecated,
+	)
+	runtime.Must(clientfeatures.AddFeaturesToExistingFeatureGates(ca))
+	clientfeatures.ReplaceFeatureGates(ca)
 }
 
 // defaultKubernetesFeatureGates consists of all known Kubernetes-specific feature keys.
