@@ -17,7 +17,6 @@ limitations under the License.
 package leaderelection
 
 import (
-	"k8s.io/client-go/tools/leaderelection"
 	k8smetrics "k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
 )
@@ -32,13 +31,6 @@ var (
 
 func init() {
 	legacyregistry.MustRegister(leaderGauge)
-	leaderelection.SetProvider(prometheusMetricsProvider{})
-}
-
-type prometheusMetricsProvider struct{}
-
-func (prometheusMetricsProvider) NewLeaderMetric() leaderelection.SwitchMetric {
-	return &switchAdapter{gauge: leaderGauge}
 }
 
 type switchAdapter struct {
@@ -51,4 +43,8 @@ func (s *switchAdapter) On(name string) {
 
 func (s *switchAdapter) Off(name string) {
 	s.gauge.WithLabelValues(name).Set(0.0)
+}
+
+func NewLeaderMetric() *switchAdapter {
+	return &switchAdapter{gauge: leaderGauge}
 }

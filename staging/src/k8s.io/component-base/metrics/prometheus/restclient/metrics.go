@@ -23,7 +23,6 @@ import (
 	"net/url"
 	"time"
 
-	"k8s.io/client-go/tools/metrics"
 	k8smetrics "k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
 )
@@ -185,7 +184,6 @@ var (
 )
 
 func init() {
-
 	legacyregistry.MustRegister(requestLatency)
 	legacyregistry.MustRegister(requestSize)
 	legacyregistry.MustRegister(responseSize)
@@ -197,20 +195,6 @@ func init() {
 	legacyregistry.MustRegister(execPluginCalls)
 	legacyregistry.MustRegister(transportCacheEntries)
 	legacyregistry.MustRegister(transportCacheCalls)
-	metrics.Register(metrics.RegisterOpts{
-		ClientCertExpiry:      execPluginCertTTLAdapter,
-		ClientCertRotationAge: &rotationAdapter{m: execPluginCertRotation},
-		RequestLatency:        &latencyAdapter{m: requestLatency},
-		ResolverLatency:       &resolverLatencyAdapter{m: resolverLatency},
-		RequestSize:           &sizeAdapter{m: requestSize},
-		ResponseSize:          &sizeAdapter{m: responseSize},
-		RateLimiterLatency:    &latencyAdapter{m: rateLimiterLatency},
-		RequestResult:         &resultAdapter{requestResult},
-		RequestRetry:          &retryAdapter{requestRetry},
-		ExecPluginCalls:       &callsAdapter{m: execPluginCalls},
-		TransportCacheEntries: &transportCacheAdapter{m: transportCacheEntries},
-		TransportCreateCalls:  &transportCacheCallsAdapter{m: transportCacheCalls},
-	})
 }
 
 type latencyAdapter struct {
@@ -291,4 +275,52 @@ type transportCacheCallsAdapter struct {
 
 func (t *transportCacheCallsAdapter) Increment(result string) {
 	t.m.WithLabelValues(result).Inc()
+}
+
+func NewClientCertExpiryMetric() *expiryToTTLAdapter {
+	return execPluginCertTTLAdapter
+}
+
+func NewClientCertRotationAgeMetric() *rotationAdapter {
+	return &rotationAdapter{m: execPluginCertRotation}
+}
+
+func NewRequestLatencyMetric() *latencyAdapter {
+	return &latencyAdapter{m: requestLatency}
+}
+
+func NewResolverLatencyMetric() *resolverLatencyAdapter {
+	return &resolverLatencyAdapter{m: resolverLatency}
+}
+
+func NewRequestSizeMetric() *sizeAdapter {
+	return &sizeAdapter{m: requestSize}
+}
+
+func NewResponseSizeMetric() *sizeAdapter {
+	return &sizeAdapter{m: responseSize}
+}
+
+func NewRateLimiterLatencyMetric() *latencyAdapter {
+	return &latencyAdapter{m: rateLimiterLatency}
+}
+
+func NewRequestResultMetric() *resultAdapter {
+	return &resultAdapter{m: requestResult}
+}
+
+func NewRequestRetryMetric() *retryAdapter {
+	return &retryAdapter{m: requestRetry}
+}
+
+func NewExecPluginCallsMetric() *callsAdapter {
+	return &callsAdapter{m: execPluginCalls}
+}
+
+func NewTransportCacheEntriesMetric() *transportCacheAdapter {
+	return &transportCacheAdapter{m: transportCacheEntries}
+}
+
+func NewTransportCacheCallsMetric() *transportCacheCallsAdapter {
+	return &transportCacheCallsAdapter{m: transportCacheCalls}
 }

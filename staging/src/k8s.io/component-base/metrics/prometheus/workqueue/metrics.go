@@ -17,7 +17,6 @@ limitations under the License.
 package workqueue
 
 import (
-	"k8s.io/client-go/util/workqueue"
 	k8smetrics "k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
 )
@@ -105,33 +104,32 @@ func init() {
 	for _, m := range metrics {
 		legacyregistry.MustRegister(m)
 	}
-	workqueue.SetProvider(prometheusMetricsProvider{})
 }
 
-func (prometheusMetricsProvider) NewDepthMetric(name string) workqueue.GaugeMetric {
+func NewDepthMetric(name string) k8smetrics.GaugeMetric {
 	return depth.WithLabelValues(name)
 }
 
-func (prometheusMetricsProvider) NewAddsMetric(name string) workqueue.CounterMetric {
+func NewAddsMetric(name string) k8smetrics.CounterMetric {
 	return adds.WithLabelValues(name)
 }
 
-func (prometheusMetricsProvider) NewLatencyMetric(name string) workqueue.HistogramMetric {
+func NewLatencyMetric(name string) k8smetrics.ObserverMetric {
 	return latency.WithLabelValues(name)
 }
 
-func (prometheusMetricsProvider) NewWorkDurationMetric(name string) workqueue.HistogramMetric {
+func NewWorkDurationMetric(name string) k8smetrics.ObserverMetric {
 	return workDuration.WithLabelValues(name)
 }
 
-func (prometheusMetricsProvider) NewUnfinishedWorkSecondsMetric(name string) workqueue.SettableGaugeMetric {
+func NewUnfinishedWorkSecondsMetric(name string) k8smetrics.GaugeMetric {
 	return unfinished.WithLabelValues(name)
 }
 
-func (prometheusMetricsProvider) NewLongestRunningProcessorSecondsMetric(name string) workqueue.SettableGaugeMetric {
+func NewLongestRunningProcessorSecondsMetric(name string) k8smetrics.GaugeMetric {
 	return longestRunningProcessor.WithLabelValues(name)
 }
 
-func (prometheusMetricsProvider) NewRetriesMetric(name string) workqueue.CounterMetric {
+func NewRetriesMetric(name string) k8smetrics.CounterMetric {
 	return retries.WithLabelValues(name)
 }

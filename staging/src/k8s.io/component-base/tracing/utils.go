@@ -28,8 +28,7 @@ import (
 	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
 	oteltrace "go.opentelemetry.io/otel/trace"
 
-	"k8s.io/client-go/transport"
-	"k8s.io/component-base/tracing/api/v1"
+	v1 "k8s.io/component-base/tracing/api/v1"
 )
 
 // TracerProvider is an OpenTelemetry TracerProvider which can be shut down
@@ -115,7 +114,7 @@ func WithTracing(handler http.Handler, tp oteltrace.TracerProvider, serviceName 
 // config, _ := rest.InClusterConfig()
 // config.Wrap(WrapperFor(tp))
 // kubeclient, _ := clientset.NewForConfig(config)
-func WrapperFor(tp oteltrace.TracerProvider) transport.WrapperFunc {
+func WrapperFor(tp oteltrace.TracerProvider) func(http.RoundTripper) http.RoundTripper {
 	return func(rt http.RoundTripper) http.RoundTripper {
 		opts := []otelhttp.Option{
 			otelhttp.WithPropagators(Propagators()),

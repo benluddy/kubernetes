@@ -21,12 +21,11 @@ import (
 	"strings"
 	"testing"
 
-	"k8s.io/client-go/tools/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/testutil"
 )
 
-func TestClientGOMetrics(t *testing.T) {
+func TestMetricAdapters(t *testing.T) {
 	tests := []struct {
 		description string
 		name        string
@@ -39,7 +38,7 @@ func TestClientGOMetrics(t *testing.T) {
 			name:        "rest_client_requests_total",
 			metric:      requestResult,
 			update: func() {
-				metrics.RequestResult.Increment(context.TODO(), "200", "POST", "www.foo.com")
+				(&resultAdapter{m: requestResult}).Increment(context.TODO(), "200", "POST", "www.foo.com")
 			},
 			want: `
 			            # HELP rest_client_requests_total [ALPHA] Number of HTTP requests, partitioned by status code, method, and host.
@@ -52,7 +51,7 @@ func TestClientGOMetrics(t *testing.T) {
 			name:        "rest_client_request_retries_total",
 			metric:      requestRetry,
 			update: func() {
-				metrics.RequestRetry.IncrementRetry(context.TODO(), "500", "GET", "www.bar.com")
+				(&retryAdapter{m: requestRetry}).IncrementRetry(context.TODO(), "500", "GET", "www.bar.com")
 			},
 			want: `
 			            # HELP rest_client_request_retries_total [ALPHA] Number of request retries, partitioned by status code, verb, and host.
