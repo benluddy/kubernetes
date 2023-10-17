@@ -17,26 +17,38 @@ limitations under the License.
 package metrics
 
 import (
+	"bytes"
 	"context"
 	"fmt"
-	"strconv"
-	"strings"
+	"io"
+	"math"
+	"net/http"
 	"testing"
+	"time"
 
-	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	flowcontrolv1beta3 "k8s.io/api/flowcontrol/v1beta3"
+	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/metrics/legacyregistry"
 	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	aggregatorclient "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/test/integration/framework"
+	"k8s.io/utils/ptr"
 
 	// the metrics are loaded on cmd/kube-apiserver/apiserver.go
 	// so we need to load them here to be available for the test
 	_ "k8s.io/component-base/metrics/prometheus/restclient"
+
+	prometheusmodel "github.com/prometheus/client_model/go"
+	"github.com/prometheus/common/expfmt"
+	corev1 "k8s.io/api/core/v1"
 )
 
 // IMPORTANT: metrics are stored globally so all the test must run serially
@@ -53,7 +65,7 @@ func TestAPIServerTransportMetrics(t *testing.T) {
 	result := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins", "ServiceAccount"}, framework.SharedEtcd())
 	defer result.TearDownFn()
 
-	client := clientset.NewForConfigOrDie(result.ClientConfig)
+	client := apiextensionsclient.NewForConfigOrDie(result.ClientConfig)
 
 	// IMPORTANT: reflect the current values if the test changes
 	//     client_test.go:1407: metric rest_client_transport_cache_entries 3
@@ -119,43 +131,43 @@ func TestAPIServerTransportMetrics(t *testing.T) {
 	}
 }
 
-func checkTransportMetrics(t *testing.T, client *clientset.Clientset) (hits int, misses int, entries int) {
+func scrapeMetrics(t testing.TB, client rest.Interface) map[string]*prometheusmodel.MetricFamily {
 	t.Helper()
-	body, err := client.RESTClient().Get().AbsPath("/metrics").DoRaw(context.Background())
+	body, err := client.Get().AbsPath("/metrics").DoRaw(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
+	p := expfmt.TextParser{}
+	mfs, err := p.TextToMetricFamilies(bytes.NewReader(body))
+	if err != nil {
+		t.Fatalf("failed to parse metrics: %v", err)
+	}
+	return mfs
+}
 
-	// TODO: this can be much better if there is some library that parse prometheus metrics
-	// the existing one in "k8s.io/component-base/metrics/testutil" uses the global variable
-	// but we want to parse the ones returned by the endpoint to be sure the metrics are
-	// exposed correctly
-	for _, line := range strings.Split(string(body), "\n") {
-		if !strings.HasPrefix(line, "rest_client_transport") {
-			continue
-		}
-		if strings.Contains(line, "uncacheable") {
-			t.Fatalf("detected transport that is not cacheable, please check https://issues.k8s.io/112017")
-		}
+func checkTransportMetrics(t *testing.T, client *apiextensionsclient.Clientset) (hits int, misses int, entries int) {
+	t.Helper()
 
-		output := strings.Split(line, " ")
-		if len(output) != 2 {
-			t.Fatalf("expected metrics to be in the format name value, got %v", output)
+	metrics := scrapeMetrics(t, client.RESTClient())
+
+	for _, m := range metrics["rest_client_transport_cache_entries"].GetMetric() {
+		entries = int(math.Round(m.GetGauge().GetValue()))
+	}
+
+	for _, m := range metrics["rest_client_transport_create_calls_total"].GetMetric() {
+		for _, l := range m.GetLabel() {
+			if l.GetName() != "result" {
+				continue
+			}
+			switch l.GetValue() {
+			case "hit":
+				hits = int(math.Round(m.GetGauge().GetValue()))
+			case "miss":
+				misses = int(math.Round(m.GetGauge().GetValue()))
+			case "uncacheable":
+				t.Fatalf("detected transport that is not cacheable, please check https://issues.k8s.io/112017")
+			}
 		}
-		name := output[0]
-		value, err := strconv.Atoi(output[1])
-		if err != nil {
-			t.Fatalf("metric value can not be converted to integer %v", err)
-		}
-		switch name {
-		case "rest_client_transport_cache_entries":
-			entries = value
-		case `rest_client_transport_create_calls_total{result="hit"}`:
-			hits = value
-		case `rest_client_transport_create_calls_total{result="miss"}`:
-			misses = value
-		}
-		t.Logf("metric %s", line)
 	}
 
 	if misses != entries || misses == 0 {
@@ -165,5 +177,135 @@ func checkTransportMetrics(t *testing.T, client *clientset.Clientset) (hits int,
 	if hits < misses {
 		t.Errorf("expected more hits %d in the cache than misses %d", hits, misses)
 	}
+
 	return
+}
+
+type RoundTripperFunc func(req *http.Request) (*http.Response, error)
+
+func (fn RoundTripperFunc) RoundTrip(req *http.Request) (*http.Response, error) {
+	return fn(req)
+}
+
+func TestRetryMetric(t *testing.T) {
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--max-requests-inflight=1", "--max-mutating-requests-inflight=0"}, framework.SharedEtcd())
+	defer server.TearDownFn()
+
+	client, err := kubernetes.NewForConfig(server.ClientConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	plc, err := client.FlowcontrolV1beta3().PriorityLevelConfigurations().Create(context.Background(), &flowcontrolv1beta3.PriorityLevelConfiguration{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "reject-everything",
+		},
+		Spec: flowcontrolv1beta3.PriorityLevelConfigurationSpec{
+			Type: flowcontrolv1beta3.PriorityLevelEnablementLimited,
+			Limited: &flowcontrolv1beta3.LimitedPriorityLevelConfiguration{
+				NominalConcurrencyShares: 1,
+				LimitResponse: flowcontrolv1beta3.LimitResponse{
+					Type: flowcontrolv1beta3.LimitResponseTypeReject,
+				},
+				BorrowingLimitPercent: ptr.To(int32(0)),
+			},
+		},
+	}, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	fs, err := client.FlowcontrolV1beta3().FlowSchemas().Create(context.Background(), &flowcontrolv1beta3.FlowSchema{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "foo",
+		},
+		Spec: flowcontrolv1beta3.FlowSchemaSpec{
+			PriorityLevelConfiguration: flowcontrolv1beta3.PriorityLevelConfigurationReference{
+				Name: plc.Name,
+			},
+			MatchingPrecedence: 2,
+			Rules: []flowcontrolv1beta3.PolicyRulesWithSubjects{
+				{
+					Subjects: []flowcontrolv1beta3.Subject{
+						{
+							Kind: flowcontrolv1beta3.SubjectKindUser,
+							User: &flowcontrolv1beta3.UserSubject{Name: "foo"},
+						},
+					},
+					ResourceRules: []flowcontrolv1beta3.ResourcePolicyRule{
+						{
+							Verbs:        []string{"create"},
+							APIGroups:    []string{"v1"},
+							Resources:    []string{"namespaces"},
+							ClusterScope: true,
+						},
+					},
+				},
+			},
+		},
+	}, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	impersonating := rest.CopyConfig(server.ClientConfig)
+	impersonating.Impersonate.UserName = "foo"
+	//impersonating.Impersonate.Groups = []string{"system:authenticated"}
+	foo, err := kubernetes.NewForConfig(impersonating)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t.Logf("fs uid: %v", fs.UID)
+	getRequestsAndRetries := func(t testing.TB) (requests int, retries int) {
+		metrics := scrapeMetrics(t, client.RESTClient())
+		for _, m := range metrics["rest_client_requests_total"].GetMetric() {
+			requests += int(m.GetCounter().GetValue())
+		}
+		for _, m := range metrics["rest_client_request_retries_total"].GetMetric() {
+			retries += int(m.GetCounter().GetValue())
+		}
+		return
+	}
+
+	pr, pw := io.Pipe()
+	defer pr.Close()
+	defer pw.Close()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go func() {
+		err := foo.RESTClient().Post().Prefix("/api/v1").Resource("namespaces").Body(pr).Timeout(10 * time.Second).Do(ctx).Error()
+		if err != nil {
+			t.Log(err)
+		}
+		t.Log("done")
+	}()
+
+	initialRequests, initialRetries := getRequestsAndRetries(t)
+
+	var nrequests int
+	if err := wait.PollUntilContextTimeout(context.Background(), 1*time.Second /*wait.ForeverTestTimeout*/, 5*time.Second, true, func(context.Context) (bool, error) {
+		nrequests++
+		_, err := foo.CoreV1().Namespaces().Create(context.Background(), &corev1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "foo",
+			},
+		}, metav1.CreateOptions{})
+		t.Logf("poll create err: %v", err)
+		if err == nil {
+			return false, nil
+		}
+		if !apierrors.IsTooManyRequests(err) {
+			return false, err
+		}
+		return true, nil
+	}); err != nil {
+		t.Fatalf("unexpected error making request: %v", err)
+	}
+
+	finalRequests, finalRetries := getRequestsAndRetries(t)
+
+	t.Fatalf("todo: (%d): %d, %d => %d %d", nrequests, initialRequests, initialRetries, finalRequests, finalRetries)
+
 }
