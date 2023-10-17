@@ -19,6 +19,7 @@ require (
 	github.com/onsi/ginkgo/v2 v2.13.0
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.8.3
+	github.com/ugorji/go/codec v1.2.11
 	golang.org/x/net v0.17.0
 	golang.org/x/time v0.3.0
 	gopkg.in/inf.v0 v0.9.1
