@@ -24,6 +24,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/runtime/serializer/cbor/direct"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 )
@@ -130,6 +131,19 @@ func (u *Unstructured) MarshalJSON() ([]byte, error) {
 func (u *Unstructured) UnmarshalJSON(b []byte) error {
 	_, _, err := UnstructuredJSONScheme.Decode(b, nil, u)
 	return err
+}
+
+func (u Unstructured) MarshalCBOR() ([]byte, error) {
+	return direct.Marshal(u.Object)
+}
+
+func (u *Unstructured) UnmarshalCBOR(src []byte) error {
+	var content map[string]interface{}
+	if err := direct.Unmarshal(src, &content); err != nil {
+		return err
+	}
+	u.Object = content
+	return nil
 }
 
 // NewEmptyInstance returns a new instance of the concrete type containing only kind/apiVersion and no other data.
