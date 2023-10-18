@@ -18,6 +18,7 @@ package cbor
 
 import (
 	"io"
+	"reflect"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -25,7 +26,20 @@ import (
 	"github.com/ugorji/go/codec"
 )
 
-var handle = codec.CborHandle{}
+var handle = func() codec.CborHandle {
+	handle := codec.CborHandle{
+		BasicHandle: codec.BasicHandle{
+			TypeInfos: codec.NewTypeInfos([]string{"json"}),
+			EncodeOptions: codec.EncodeOptions{
+				Canonical:   true,
+				StringToRaw: true,
+				OptimumSize: true,
+			},
+		},
+	}
+
+	return handle
+}()
 
 type Serializer struct{}
 
@@ -38,7 +52,11 @@ func (s *Serializer) Identifier() runtime.Identifier {
 }
 
 func (s *Serializer) Encode(obj runtime.Object, w io.Writer) error {
-	panic("unimplemented")
+	// https://www.rfc-editor.org/rfc/rfc8949.html#name-self-described-cbor
+	if _, err := w.Write([]byte{0xd9, 0xd9, 0xf7}); err != nil {
+		return err
+	}
+	return codec.NewEncoder(w, &handle).Encode(obj)
 }
 
 func (s *Serializer) Decode(data []byte, gvk *schema.GroupVersionKind, into runtime.Object) (runtime.Object, *schema.GroupVersionKind, error) {
