@@ -20,6 +20,7 @@ package app
 import (
 	"context"
 	"crypto/tls"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -39,6 +40,7 @@ import (
 	"github.com/spf13/pflag"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"gopkg.in/yaml.v2"
 	"k8s.io/klog/v2"
 	"k8s.io/mount-utils"
 
@@ -315,11 +317,28 @@ func mergeKubeletConfigurations(kubeletConfig *kubeletconfiginternal.KubeletConf
 			return err
 		}
 		if !info.IsDir() && filepath.Ext(info.Name()) == dropinFileExtension {
-			dropinConfig, err := loadConfigFile(path)
+			configBytes, err := os.ReadFile(path)
 			if err != nil {
-				return fmt.Errorf("failed to load kubelet dropin file, path: %s, error: %w", path, err)
+				return fmt.Errorf("failed to read kubelet dropin file, path: %s, error: %w", path, err)
+			}
+			// Unmarshal drop-in configuration into kubeletConfig type
+			var config map[interface{}]interface{}
+			if err := yaml.Unmarshal(configBytes, &config); err != nil {
+				return fmt.Errorf("failed to unmarshal kubelet dropin config:%s, path: %s, error: %w", string(configBytes), path, err)
 			}
 
+			dropInConfigMap := convertMap(config).(map[string]interface{})
+
+			// Convert map to JSON
+			data, err := json.Marshal(dropInConfigMap)
+			if err != nil {
+				return fmt.Errorf("failed to convert map to JSON: %w", err)
+			}
+			// Unmarshal JSON to *kubeletconfiginternal.KubeletConfiguration
+			var dropinConfig kubeletconfiginternal.KubeletConfiguration
+			if err := json.Unmarshal(data, &dropinConfig); err != nil {
+				return fmt.Errorf("failed to unmarshal JSON to KubeletConfiguration: %w", err)
+			}
 			// Merge dropinConfig with kubeletConfig
 			if err := mergo.Merge(kubeletConfig, dropinConfig, mergo.WithOverride); err != nil {
 				return fmt.Errorf("failed to merge kubelet drop-in config, path: %s, error: %w", path, err)
@@ -333,6 +352,23 @@ func mergeKubeletConfigurations(kubeletConfig *kubeletconfiginternal.KubeletConf
 	}
 
 	return nil
+}
+
+// convertMap recursively convert map[interface{}]interface{} to map[string]interface{}
+func convertMap(i interface{}) interface{} {
+	switch x := i.(type) {
+	case map[interface{}]interface{}:
+		m2 := map[string]interface{}{}
+		for k, v := range x {
+			m2[fmt.Sprint(k)] = convertMap(v)
+		}
+		return m2
+	case []interface{}:
+		for i, v := range x {
+			x[i] = convertMap(v)
+		}
+	}
+	return i
 }
 
 // newFlagSetWithGlobals constructs a new pflag.FlagSet with global flags registered
