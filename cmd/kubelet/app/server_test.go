@@ -21,8 +21,10 @@ import (
 	"path/filepath"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/cmd/kubelet/app/options"
 	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/config"
 )
@@ -84,6 +86,7 @@ apiVersion: kubelet.config.k8s.io/v1beta1
 kind: KubeletConfiguration
 port: 9080
 readOnlyPort: 10257
+syncFrequency: 5m
 `,
 			dropin1: `
 apiVersion: kubelet.config.k8s.io/v1beta1
@@ -97,8 +100,9 @@ port: 8080
 readOnlyPort: 10255
 `,
 			overwrittenConfigFields: map[string]interface{}{
-				"Port":         int32(8080),
-				"ReadOnlyPort": int32(10255),
+				"Port":          int32(8080),
+				"ReadOnlyPort":  int32(10255),
+				"SyncFrequency": metav1.Duration{Duration: 5 * time.Minute},
 			},
 			name: "kubelet.conf.d overrides kubelet.conf",
 		},
