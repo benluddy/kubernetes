@@ -26,6 +26,10 @@ import (
 	"github.com/fxamacker/cbor/v2"
 )
 
+func nilPointerFor[T interface{}]() *T {
+	return nil
+}
+
 func TestRoundtrip(t *testing.T) {
 	type modePair struct {
 		enc cbor.EncMode
@@ -52,6 +56,14 @@ func TestRoundtrip(t *testing.T) {
 		{
 			name: "empty map",
 			obj:  map[string]interface{}{},
+		},
+		{
+			name: "nil pointer to slice",
+			obj:  nilPointerFor[[]interface{}](),
+		},
+		{
+			name: "nil pointer to map",
+			obj:  nilPointerFor[map[string]interface{}](),
 		},
 		{
 			name: "nonempty string",
@@ -125,6 +137,30 @@ func TestRoundtrip(t *testing.T) {
 			name: "nil pointer omitempty",
 			obj: struct {
 				V *struct{} `json:"v,omitempty"`
+			}{},
+		},
+		{
+			name: "nil pointer to slice as struct field",
+			obj: struct {
+				V *[]interface{} `json:"v"`
+			}{},
+		},
+		{
+			name: "nil pointer to slice as struct field with omitempty",
+			obj: struct {
+				V *[]interface{} `json:"v,omitempty"`
+			}{},
+		},
+		{
+			name: "nil pointer to map as struct field",
+			obj: struct {
+				V *map[string]interface{} `json:"v"`
+			}{},
+		},
+		{
+			name: "nil pointer to map as struct field with omitempty",
+			obj: struct {
+				V *map[string]interface{} `json:"v,omitempty"`
 			}{},
 		},
 	} {
