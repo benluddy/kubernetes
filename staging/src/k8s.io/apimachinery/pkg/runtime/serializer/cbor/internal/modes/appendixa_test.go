@@ -128,7 +128,6 @@ func TestAppendixA(t *testing.T) {
 		{
 			example: hex("3bffffffffffffffff"),
 			reject:  "-2^64-1 overflows int64 and falling back to float64 (as with JSON) loses distinction between float and integer",
-			fixme:   "decoding integers that overflow int64 must not produce math/big.Int",
 		},
 		{
 			example: hex("c349010000000000000000"),
@@ -330,7 +329,6 @@ func TestAppendixA(t *testing.T) {
 			reasons: []string{
 				reasonTagIgnored,
 			},
-			fixme: "unrecognized tags should not decode as cbor.Tag",
 		},
 		{
 			example: hex("d818456449455446"),
@@ -339,7 +337,6 @@ func TestAppendixA(t *testing.T) {
 			reasons: []string{
 				reasonTagIgnored,
 			},
-			fixme: "unrecognized tags should not decode as cbor.Tag",
 		},
 		{
 			example: hex("d82076687474703a2f2f7777772e6578616d706c652e636f6d"),
@@ -349,17 +346,14 @@ func TestAppendixA(t *testing.T) {
 				reasonByteString,
 				reasonTagIgnored,
 			},
-			fixme: "unrecognized tags should not decode as cbor.Tag",
 		},
 		{
 			example: hex("40"),
 			decoded: "",
-			fixme:   "strings must encode to the byte string type to avoid producing invalid text strings",
 		},
 		{
 			example: hex("4401020304"),
 			decoded: "\x01\x02\x03\x04",
-			fixme:   "strings must encode to the byte string type to avoid producing invalid text strings",
 		},
 		{
 			example: hex("60"),
@@ -368,7 +362,6 @@ func TestAppendixA(t *testing.T) {
 			reasons: []string{
 				reasonByteString,
 			},
-			fixme: "strings must encode to the byte string type to avoid producing invalid text strings",
 		},
 		{
 			example: hex("6161"),
@@ -377,7 +370,6 @@ func TestAppendixA(t *testing.T) {
 			reasons: []string{
 				reasonByteString,
 			},
-			fixme: "strings must encode to the byte string type to avoid producing invalid text strings",
 		},
 		{
 			example: hex("6449455446"),
@@ -386,7 +378,6 @@ func TestAppendixA(t *testing.T) {
 			reasons: []string{
 				reasonByteString,
 			},
-			fixme: "strings must encode to the byte string type to avoid producing invalid text strings",
 		},
 		{
 			example: hex("62225c"),
@@ -395,7 +386,6 @@ func TestAppendixA(t *testing.T) {
 			reasons: []string{
 				reasonByteString,
 			},
-			fixme: "strings must encode to the byte string type to avoid producing invalid text strings",
 		},
 		{
 			example: hex("62c3bc"),
@@ -404,7 +394,6 @@ func TestAppendixA(t *testing.T) {
 			reasons: []string{
 				reasonByteString,
 			},
-			fixme: "strings must encode to the byte string type to avoid producing invalid text strings",
 		},
 		{
 			example: hex("63e6b0b4"),
@@ -413,7 +402,6 @@ func TestAppendixA(t *testing.T) {
 			reasons: []string{
 				reasonByteString,
 			},
-			fixme: "strings must encode to the byte string type to avoid producing invalid text strings",
 		},
 		{
 			example: hex("64f0908591"),
@@ -422,7 +410,6 @@ func TestAppendixA(t *testing.T) {
 			reasons: []string{
 				reasonByteString,
 			},
-			fixme: "strings must encode to the byte string type to avoid producing invalid text strings",
 		},
 		{
 			example: hex("80"),
@@ -458,7 +445,6 @@ func TestAppendixA(t *testing.T) {
 			reasons: []string{
 				reasonByteString,
 			},
-			fixme: "strings must encode to the byte string type to avoid producing invalid text strings",
 		},
 		{
 			example: hex("826161a161626163"),
@@ -470,7 +456,6 @@ func TestAppendixA(t *testing.T) {
 			reasons: []string{
 				reasonByteString,
 			},
-			fixme: "strings must encode to the byte string type to avoid producing invalid text strings",
 		},
 		{
 			example: hex("a56161614161626142616361436164614461656145"),
@@ -485,7 +470,6 @@ func TestAppendixA(t *testing.T) {
 			reasons: []string{
 				reasonByteString,
 			},
-			fixme: "strings must encode to the byte string type to avoid producing invalid text strings",
 		},
 		{
 			example: hex("5f42010243030405ff"),
@@ -494,7 +478,6 @@ func TestAppendixA(t *testing.T) {
 			reasons: []string{
 				reasonStringFixedLength,
 			},
-			fixme: "strings must encode to the byte string type to avoid producing invalid text strings",
 		},
 		{
 			example: hex("7f657374726561646d696e67ff"),
@@ -504,7 +487,6 @@ func TestAppendixA(t *testing.T) {
 				reasonByteString,
 				reasonStringFixedLength,
 			},
-			fixme: "strings must encode to the byte string type to avoid producing invalid text strings",
 		},
 		{
 			example: hex("9fff"),
@@ -588,7 +570,6 @@ func TestAppendixA(t *testing.T) {
 				reasonByteString,
 				reasonMapFixedLength,
 			},
-			fixme: "strings must encode to the byte string type to avoid producing invalid text strings",
 		},
 		{
 			example: hex("826161bf61626163ff"),
@@ -598,7 +579,6 @@ func TestAppendixA(t *testing.T) {
 				reasonByteString,
 				reasonMapFixedLength,
 			},
-			fixme: "strings must encode to the byte string type to avoid producing invalid text strings",
 		},
 		{
 			example: hex("bf6346756ef563416d7421ff"),
@@ -612,7 +592,6 @@ func TestAppendixA(t *testing.T) {
 				reasonMapFixedLength,
 				reasonMapSorted,
 			},
-			fixme: "strings must encode to the byte string type to avoid producing invalid text strings",
 		},
 	} {
 		t.Run(fmt.Sprintf("%x", tc.example), func(t *testing.T) {

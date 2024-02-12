@@ -49,7 +49,7 @@ var Decode cbor.DecMode = func() cbor.DecMode {
 
 		// Decode type 0 (unsigned integer) as int64.
 		// TODO: IntDecConvertSigned errors on overflow, JSON will try to fall back to float64.
-		IntDec: cbor.IntDecConvertSigned,
+		IntDec: cbor.IntDecConvertSignedOrFail,
 
 		// Disable producing map[cbor.ByteString]interface{}, which is not acceptable for
 		// decodes into interface{}.
@@ -68,6 +68,22 @@ var Decode cbor.DecMode = func() cbor.DecMode {
 		// sequences and may use the byte string major type to encode strings that have not
 		// been validated.
 		UTF8: cbor.UTF8RejectInvalid,
+
+		// Never make a case-insensitive match between a map key and a struct field.
+		FieldNameMatching: cbor.FieldNameMatchingCaseSensitive,
+
+		// Produce string concrete values when decoding a CBOR byte string into interface{}.
+		DefaultByteStringType: reflect.TypeOf(""),
+
+		// Allow CBOR byte strings to be decoded into string destination values.
+		ByteStringToString: cbor.ByteStringToStringAllowed,
+
+		// Allow CBOR byte strings to match struct fields when appearing as a map key.
+		FieldNameByteString: cbor.FieldNameByteStringAllowed,
+
+		// When decoding an unrecognized tag to interface{}, return the decoded tag content
+		// instead of the default, a cbor.Tag representing a (number, content) pair.
+		UnrecognizedTagToAny: cbor.UnrecognizedTagContentToAny,
 	}.DecMode()
 	if err != nil {
 		panic(err)

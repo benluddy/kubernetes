@@ -55,6 +55,24 @@ var Encode cbor.EncMode = func() cbor.EncMode {
 
 		// Preserve distinction between nil and empty for slices and maps.
 		NilContainers: cbor.NilContainerAsNull,
+
+		// OK to produce tags.
+		TagsMd: cbor.TagsAllowed,
+
+		// Use the same definition of "empty" as encoding/json.
+		OmitEmpty: cbor.OmitEmptyGoValue,
+
+		// The CBOR types text string and byte string are structurally equivalent, with the
+		// semantic difference that a text string whose content is an invalid UTF-8 sequence
+		// is itself invalid. We reject all invalid text strings at decode time and do not
+		// validate or sanitize all Go strings at encode time. Encoding Go strings to the
+		// byte string type is comparable to the existing Protobuf behavior and cheaply
+		// ensures that the output is valid CBOR.
+		String: cbor.StringToByteString,
+
+		// Encode struct field names to the byte string type rather than the text string
+		// type.
+		FieldName: cbor.FieldNameToByteString,
 	}.EncMode()
 	if err != nil {
 		panic(err)
