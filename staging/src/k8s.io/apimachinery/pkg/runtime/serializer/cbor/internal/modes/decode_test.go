@@ -28,14 +28,15 @@ import (
 	"github.com/google/go-cmp/cmp"
 )
 
-func TestDecode(t *testing.T) {
-	hex := func(h string) []byte {
-		b, err := hex.DecodeString(h)
-		if err != nil {
-			t.Fatal(err)
-		}
-		return b
+func hexDecode(h string, t *testing.T) []byte {
+	b, err := hex.DecodeString(h)
+	if err != nil {
+		t.Fatal(err)
 	}
+	return b
+}
+
+func TestDecode(t *testing.T) {
 
 	for _, tc := range []struct {
 		name          string
@@ -47,7 +48,7 @@ func TestDecode(t *testing.T) {
 	}{
 		{
 			name: "reject text string containing invalid utf-8 sequence",
-			in:   hex("6180"), // text string beginning with continuation byte 0x80
+			in:   hexDecode("6180", t), // text string beginning with continuation byte 0x80
 			assertOnError: assertOnConcreteError(func(t *testing.T, e *cbor.SemanticError) {
 				const expected = "cbor: invalid UTF-8 string"
 				if msg := e.Error(); msg != expected {
@@ -57,14 +58,14 @@ func TestDecode(t *testing.T) {
 		},
 		{
 			name:          "unsigned integer decodes to interface{} as int64",
-			in:            hex("0a"), // 10
+			in:            hexDecode("0a", t), // 10
 			want:          int64(10),
 			assertOnError: assertNilError,
 		},
 		{
 			name:  "unknown field error",
 			modes: []cbor.DecMode{modes.Decode},
-			in:    hex("a1616101"), // {"a": 1}
+			in:    hexDecode("a1616101", t), // {"a": 1}
 			into:  struct{}{},
 			assertOnError: assertOnConcreteError(func(t *testing.T, e *cbor.UnknownFieldError) {
 				if e.Index != 0 {
@@ -75,20 +76,20 @@ func TestDecode(t *testing.T) {
 		{
 			name:          "no unknown field error in lax mode",
 			modes:         []cbor.DecMode{modes.DecodeLax},
-			in:            hex("a1616101"), // {"a": 1}
+			in:            hexDecode("a1616101", t), // {"a": 1}
 			into:          struct{}{},
 			want:          struct{}{},
 			assertOnError: assertNilError,
 		},
 		{
 			name:          "indefinite-length text string",
-			in:            hex("7f616161626163ff"), // (_ "a", "b", "c")
+			in:            hexDecode("7f616161626163ff", t), // (_ "a", "b", "c")
 			want:          "abc",
 			assertOnError: assertNilError,
 		},
 		{
 			name: "nested indefinite-length array",
-			in:   hex("9f9f8080ff9f8080ffff"), // [_ [_ [] []] [_ [][]]]
+			in:   hexDecode("9f9f8080ff9f8080ffff", t), // [_ [_ [] []] [_ [][]]]
 			want: []interface{}{
 				[]interface{}{[]interface{}{}, []interface{}{}},
 				[]interface{}{[]interface{}{}, []interface{}{}},
@@ -97,7 +98,7 @@ func TestDecode(t *testing.T) {
 		},
 		{
 			name: "nested indefinite-length map",
-			in:   hex("bf6141bf616101616202ff6142bf616901616a02ffff"), // {_ "A": {_ "a": 1, "b": 2}, "B": {_ "i": 1, "j": 2}}
+			in:   hexDecode("bf6141bf616101616202ff6142bf616901616a02ffff", t), // {_ "A": {_ "a": 1, "b": 2}, "B": {_ "i": 1, "j": 2}}
 			want: map[string]interface{}{
 				"A": map[string]interface{}{"a": int64(1), "b": int64(2)},
 				"B": map[string]interface{}{"i": int64(1), "j": int64(2)},
@@ -133,5 +134,72 @@ func TestDecode(t *testing.T) {
 				}
 			})
 		}
+	}
+}
+
+func TestDecodeToAny(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		modes       []cbor.DecMode
+		in          []byte
+		inDesc      string
+		wantType    interface{}
+		failureDesc string
+	}{
+		{
+			name:     "int64 min value",
+			modes:    []cbor.DecMode{modes.Decode},
+			in:       hexDecode("00", t),
+			inDesc:   "0 - minimum positive number",
+			wantType: reflect.TypeOf(int64(0)),
+		},
+		{
+			name:     "int64 max value",
+			modes:    []cbor.DecMode{modes.Decode},
+			in:       hexDecode("1B7FFFFFFFFFFFFFFF", t),
+			inDesc:   "math.MaxInt64 - max positive number",
+			wantType: reflect.TypeOf(int64(0)),
+		},
+		{
+			name:        "tag 0 timestamp string",
+			modes:       []cbor.DecMode{modes.Decode},
+			in:          hexDecode("C077313938352D30342D31325432333A32303A35302E35325A", t),
+			inDesc:      "0(\"1985-04-12T23:20:50.52Z\") - a RFC3339 timestamp tagged with 0",
+			wantType:    reflect.TypeOf("str"),
+			failureDesc: "decoding cbor data tagged with 0 produces time.Time instead of RFC3339 timestamp string",
+		},
+		{
+			name:     "simple value 20",
+			modes:    []cbor.DecMode{modes.Decode},
+			in:       hexDecode("F4", t),
+			inDesc:   "false - simple value 20",
+			wantType: reflect.TypeOf(false),
+		},
+	} {
+		ms := tc.modes
+		if len(ms) == 0 {
+			ms = allDecModes
+		}
+
+		for _, dm := range ms {
+			modeName, ok := decModeNames[dm]
+			if !ok {
+				t.Fatal("test case configured to run against unrecognized mode")
+			}
+			t.Run(fmt.Sprintf("mode=%s/%s", modeName, tc.name), func(t *testing.T) {
+				if tc.failureDesc != "" {
+					t.Skip(tc.failureDesc)
+				}
+
+				var dst interface{}
+				if err := dm.Unmarshal(tc.in, &dst); err != nil {
+					t.Errorf("unexpected error: %v", err)
+				}
+				if tc.wantType != reflect.TypeOf(dst) {
+					t.Errorf("Have: %s, want: %s \n", reflect.TypeOf(dst), tc.wantType)
+				}
+			})
+		}
+
 	}
 }
