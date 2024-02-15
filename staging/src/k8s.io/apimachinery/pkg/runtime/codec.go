@@ -275,6 +275,31 @@ func SerializerInfoForMediaType(types []SerializerInfo, mediaType string) (Seria
 	return SerializerInfo{}, false
 }
 
+func SerializerInfoForMediaTypeOrSuffix(types []SerializerInfo, mediaType string) (SerializerInfo, bool) {
+	for _, info := range types {
+		if info.MediaType == mediaType {
+			return info, true
+		}
+	}
+	// https://www.rfc-editor.org/rfc/rfc6838.html#section-4.2.8
+	if i := strings.LastIndex(mediaType, "+"); i >= 0 {
+		switch mediaType[i:] {
+		case "+json":
+			return SerializerInfoForMediaType(types, "application/json")
+		case "+yaml":
+			return SerializerInfoForMediaType(types, "application/yaml")
+		case "+cbor":
+			return SerializerInfoForMediaType(types, "application/cbor")
+		}
+	}
+	for _, info := range types {
+		if len(info.MediaType) == 0 {
+			return info, true
+		}
+	}
+	return SerializerInfo{}, false
+}
+
 var (
 	// InternalGroupVersioner will always prefer the internal version for a given group version kind.
 	InternalGroupVersioner GroupVersioner = internalGroupVersioner{}

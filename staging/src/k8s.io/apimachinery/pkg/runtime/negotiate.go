@@ -45,7 +45,7 @@ func (n *clientNegotiator) Encoder(contentType string, params map[string]string)
 	// TODO: `pretty=1` is handled in NegotiateOutputMediaType, consider moving it to this method
 	// if client negotiators truly need to use it
 	mediaTypes := n.serializer.SupportedMediaTypes()
-	info, ok := SerializerInfoForMediaType(mediaTypes, contentType)
+	info, ok := SerializerInfoForMediaTypeOrSuffix(mediaTypes, contentType)
 	if !ok {
 		if len(contentType) != 0 || len(mediaTypes) == 0 {
 			return nil, NegotiateError{ContentType: contentType}

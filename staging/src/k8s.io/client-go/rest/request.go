@@ -94,7 +94,8 @@ func defaultRequestRetryFn(maxRetries int) WithRetry {
 // Any errors are stored until the end of your call, so you only have to
 // check once.
 type Request struct {
-	c *RESTClient
+	c           *RESTClient
+	contentType string
 
 	warningHandler WarningHandler
 
@@ -151,6 +152,7 @@ func NewRequest(c *RESTClient) *Request {
 
 	r := &Request{
 		c:              c,
+		contentType:    c.content.ContentType,
 		rateLimiter:    c.rateLimiter,
 		backoff:        backoff,
 		timeout:        timeout,
@@ -403,6 +405,9 @@ func (r *Request) SetHeader(key string, values ...string) *Request {
 	r.headers.Del(key)
 	for _, value := range values {
 		r.headers.Add(key, value)
+		if http.CanonicalHeaderKey(key) == "Content-Type" {
+			r.contentType = value
+		}
 	}
 	return r
 }
@@ -462,7 +467,7 @@ func (r *Request) Body(obj interface{}) *Request {
 		if reflect.ValueOf(t).IsNil() {
 			return r
 		}
-		encoder, err := r.c.content.Negotiator.Encoder(r.c.content.ContentType, nil)
+		encoder, err := r.c.content.Negotiator.Encoder(r.contentType, nil)
 		if err != nil {
 			r.err = err
 			return r
@@ -475,7 +480,7 @@ func (r *Request) Body(obj interface{}) *Request {
 		glogBody("Request Body", data)
 		r.body = nil
 		r.bodyBytes = data
-		r.SetHeader("Content-Type", r.c.content.ContentType)
+		r.SetHeader("Content-Type", r.contentType)
 	default:
 		r.err = fmt.Errorf("unknown type used for body: %+v", obj)
 	}
