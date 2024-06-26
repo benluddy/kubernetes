@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"errors"
 
+	cbor "k8s.io/apimachinery/pkg/runtime/serializer/cbor/direct"
 	"k8s.io/apimachinery/pkg/util/json"
 )
 
@@ -59,6 +60,27 @@ func (s *JSONSchemaPropsOrBool) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+func (s JSONSchemaPropsOrBool) MarshalCBOR() ([]byte, error) {
+	if s.Schema != nil {
+		return cbor.Marshal(s.Schema)
+	}
+	return cbor.Marshal(s.Allows)
+}
+
+func (s *JSONSchemaPropsOrBool) UnmarshalCBOR(data []byte) error {
+	var b bool
+	if err := cbor.Unmarshal(data, &b); err == nil {
+		*s = JSONSchemaPropsOrBool{Allows: b}
+		return nil
+	}
+	var p JSONSchemaProps
+	if err := cbor.Unmarshal(data, &p); err != nil {
+		return err
+	}
+	*s = JSONSchemaPropsOrBool{Allows: true, Schema: &p}
+	return nil
+}
+
 func (s JSONSchemaPropsOrStringArray) MarshalJSON() ([]byte, error) {
 	if len(s.Property) > 0 {
 		return json.Marshal(s.Property)
@@ -91,6 +113,30 @@ func (s *JSONSchemaPropsOrStringArray) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+func (s JSONSchemaPropsOrStringArray) MarshalCBOR() ([]byte, error) {
+	if len(s.Property) > 0 {
+		return cbor.Marshal(s.Property)
+	}
+	if s.Schema != nil {
+		return cbor.Marshal(s.Schema)
+	}
+	return cbor.Marshal(nil)
+}
+
+func (s *JSONSchemaPropsOrStringArray) UnmarshalCBOR(data []byte) error {
+	var a []string
+	if err := cbor.Unmarshal(data, &a); err == nil {
+		*s = JSONSchemaPropsOrStringArray{Property: a}
+		return nil
+	}
+	var p JSONSchemaProps
+	if err := cbor.Unmarshal(data, &p); err != nil {
+		return err
+	}
+	*s = JSONSchemaPropsOrStringArray{Schema: &p}
+	return nil
+}
+
 func (s JSONSchemaPropsOrArray) MarshalJSON() ([]byte, error) {
 	if len(s.JSONSchemas) > 0 {
 		return json.Marshal(s.JSONSchemas)
@@ -120,6 +166,27 @@ func (s *JSONSchemaPropsOrArray) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+func (s JSONSchemaPropsOrArray) MarshalCBOR() ([]byte, error) {
+	if len(s.JSONSchemas) > 0 {
+		return cbor.Marshal(s.JSONSchemas)
+	}
+	return cbor.Marshal(s.Schema)
+}
+
+func (s *JSONSchemaPropsOrArray) UnmarshalCBOR(data []byte) error {
+	var p JSONSchemaProps
+	if err := cbor.Unmarshal(data, &p); err == nil {
+		*s = JSONSchemaPropsOrArray{Schema: &p}
+		return nil
+	}
+	var a []JSONSchemaProps
+	if err := cbor.Unmarshal(data, &a); err != nil {
+		return err
+	}
+	*s = JSONSchemaPropsOrArray{JSONSchemas: a}
+	return nil
+}
+
 func (s JSON) MarshalJSON() ([]byte, error) {
 	if len(s.Raw) > 0 {
 		return s.Raw, nil
@@ -132,5 +199,34 @@ func (s *JSON) UnmarshalJSON(data []byte) error {
 	if len(data) > 0 && !bytes.Equal(data, nullLiteral) {
 		s.Raw = data
 	}
+	return nil
+}
+
+func (s JSON) MarshalCBOR() ([]byte, error) {
+	if len(s.Raw) == 0 {
+		return cbor.Marshal(nil)
+	}
+	var u any
+	if err := json.Unmarshal(s.Raw, &u); err != nil {
+		return nil, err
+	}
+	return cbor.Marshal(u)
+}
+
+var cborNull = []byte{0xf6}
+
+func (s *JSON) UnmarshalCBOR(data []byte) error {
+	if bytes.Equal(data, cborNull) {
+		return nil
+	}
+	var u any
+	if err := cbor.Unmarshal(data, &u); err != nil {
+		return err
+	}
+	raw, err := json.Marshal(u)
+	if err != nil {
+		return err
+	}
+	s.Raw = raw
 	return nil
 }

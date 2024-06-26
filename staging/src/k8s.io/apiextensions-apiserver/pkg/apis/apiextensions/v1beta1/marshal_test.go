@@ -20,6 +20,9 @@ import (
 	"encoding/json"
 	"reflect"
 	"testing"
+
+	"github.com/google/go-cmp/cmp"
+	cbor "k8s.io/apimachinery/pkg/runtime/serializer/cbor/direct"
 )
 
 type JSONSchemaPropsOrBoolHolder struct {
@@ -56,7 +59,74 @@ func TestJSONSchemaPropsOrBoolUnmarshalJSON(t *testing.T) {
 	}
 }
 
-func TestStringArrayOrStringMarshalJSON(t *testing.T) {
+func TestJSONSchemaPropsOrBoolUnmarshalCBOR(t *testing.T) {
+	cases := []struct {
+		name     string
+		input    string
+		expected JSONSchemaPropsOrBoolHolder
+	}{
+		{
+			name:     "empty parent",
+			input:    "\xA0",
+			expected: JSONSchemaPropsOrBoolHolder{},
+		},
+		{
+			name:     "empty",
+			input:    "\xA1\x44val1\xA0",
+			expected: JSONSchemaPropsOrBoolHolder{JSPoB: JSONSchemaPropsOrBool{Allows: true, Schema: &JSONSchemaProps{}}},
+		},
+		{
+			name:     "with schema props",
+			input:    "\xA1\x44val1\xA1\x44type\x46string",
+			expected: JSONSchemaPropsOrBoolHolder{JSPoB: JSONSchemaPropsOrBool{Allows: true, Schema: &JSONSchemaProps{Type: "string"}}},
+		},
+		{
+			name:     "bool false",
+			input:    "\xA1\x44val1\xF4",
+			expected: JSONSchemaPropsOrBoolHolder{JSPoB: JSONSchemaPropsOrBool{}},
+		},
+		{
+			name:     "bool true",
+			input:    "\xA1\x44val1\xF5",
+			expected: JSONSchemaPropsOrBoolHolder{JSPoB: JSONSchemaPropsOrBool{Allows: true}},
+		},
+		{
+			name:     "omitempty empty",
+			input:    "\xA1\x44val2\xA0",
+			expected: JSONSchemaPropsOrBoolHolder{JSPoBOmitEmpty: &JSONSchemaPropsOrBool{Allows: true, Schema: &JSONSchemaProps{}}},
+		},
+		{
+			name:     "omitempty with schema props",
+			input:    "\xA1\x44val2\xA1\x44type\x46string",
+			expected: JSONSchemaPropsOrBoolHolder{JSPoBOmitEmpty: &JSONSchemaPropsOrBool{Allows: true, Schema: &JSONSchemaProps{Type: "string"}}},
+		},
+		{
+			name:     "omitempty bool false",
+			input:    "\xA1\x44val2\xF4",
+			expected: JSONSchemaPropsOrBoolHolder{JSPoBOmitEmpty: &JSONSchemaPropsOrBool{}},
+		},
+		{
+			name:     "omitempty bool true",
+			input:    "\xA1\x44val2\xF5",
+			expected: JSONSchemaPropsOrBoolHolder{JSPoBOmitEmpty: &JSONSchemaPropsOrBool{Allows: true}},
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			var result JSONSchemaPropsOrBoolHolder
+			if err := cbor.Unmarshal([]byte(c.input), &result); err != nil {
+				t.Errorf("Failed to unmarshal input '%v': %v", c.input, err)
+			}
+			if !reflect.DeepEqual(result, c.expected) {
+				t.Errorf("Failed to unmarshal input %X", c.input)
+				t.Logf(cmp.Diff(c.expected, result))
+			}
+		})
+	}
+}
+
+func TestJSONSchemaPropsOrBoolMarshalJSON(t *testing.T) {
 	cases := []struct {
 		input  JSONSchemaPropsOrBoolHolder
 		result string
@@ -82,6 +152,75 @@ func TestStringArrayOrStringMarshalJSON(t *testing.T) {
 		if string(result) != c.result {
 			t.Errorf("Failed to marshal input '%v': expected: %q, got %q", c.input, c.result, string(result))
 		}
+	}
+}
+
+func TestJSONSchemaPropsOrBoolMarshalCBOR(t *testing.T) {
+	cases := []struct {
+		name     string
+		input    JSONSchemaPropsOrBoolHolder
+		expected string
+	}{
+		{
+			name:     "empty parent",
+			input:    JSONSchemaPropsOrBoolHolder{},
+			expected: "\xA1\x44val1\xF4",
+		},
+		{
+			name:     "empty",
+			input:    JSONSchemaPropsOrBoolHolder{JSPoB: JSONSchemaPropsOrBool{Schema: &JSONSchemaProps{}}},
+			expected: "\xA1\x44val1\xA0",
+		},
+		{
+			name:     "with schema props",
+			input:    JSONSchemaPropsOrBoolHolder{JSPoB: JSONSchemaPropsOrBool{Schema: &JSONSchemaProps{Type: "string"}}},
+			expected: "\xA1\x44val1\xA1\x44type\x46string",
+		},
+		{
+			name:     "bool false",
+			input:    JSONSchemaPropsOrBoolHolder{JSPoB: JSONSchemaPropsOrBool{}},
+			expected: "\xA1\x44val1\xF4",
+		},
+		{
+			name:     "bool true",
+			input:    JSONSchemaPropsOrBoolHolder{JSPoB: JSONSchemaPropsOrBool{Allows: true}},
+			expected: "\xA1\x44val1\xF5",
+		},
+		{
+			name:     "omitempty empty",
+			input:    JSONSchemaPropsOrBoolHolder{JSPoBOmitEmpty: &JSONSchemaPropsOrBool{Schema: &JSONSchemaProps{}}},
+			expected: "\xA2\x44val1\xF4\x44val2\xA0",
+		},
+		{
+			name:     "omitempty with schema props",
+			input:    JSONSchemaPropsOrBoolHolder{JSPoBOmitEmpty: &JSONSchemaPropsOrBool{Schema: &JSONSchemaProps{Type: "string"}}},
+			expected: "\xA2\x44val1\xF4\x44val2\xA1\x44type\x46string",
+		},
+		{
+			name:     "omitempty bool false",
+			input:    JSONSchemaPropsOrBoolHolder{JSPoBOmitEmpty: &JSONSchemaPropsOrBool{}},
+			expected: "\xA2\x44val1\xF4\x44val2\xF4",
+		},
+		{
+			name:     "omitempty bool true",
+			input:    JSONSchemaPropsOrBoolHolder{JSPoBOmitEmpty: &JSONSchemaPropsOrBool{Allows: true}},
+			expected: "\xA2\x44val1\xF4\x44val2\xF5",
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			result, err := cbor.Marshal(&c.input)
+			if err != nil {
+				t.Errorf("Unexpected error marshaling input '%v': %v", c.input, err)
+			}
+			if string(result) != c.expected {
+				t.Errorf("Failed to marshal input")
+				t.Logf("input   : %v", c.input)
+				t.Logf("expected: %X", c.expected)
+				t.Logf("actual  : %X", result)
+			}
+		})
 	}
 }
 
@@ -119,6 +258,73 @@ func TestJSONSchemaPropsOrArrayUnmarshalJSON(t *testing.T) {
 	}
 }
 
+func TestJSONSchemaPropsOrArrayUnmarshalCBOR(t *testing.T) {
+	cases := []struct {
+		name     string
+		input    string
+		expected JSONSchemaPropsOrArrayHolder
+	}{
+		{
+			name:     "empty parent",
+			input:    "\xA0",
+			expected: JSONSchemaPropsOrArrayHolder{},
+		},
+		{
+			name:     "props zero value",
+			input:    "\xA1\x44val1\xA0",
+			expected: JSONSchemaPropsOrArrayHolder{JSPoA: JSONSchemaPropsOrArray{Schema: &JSONSchemaProps{}}},
+		},
+		{
+			name:     "props",
+			input:    "\xA1\x44val1\xA1\x44type\x46string",
+			expected: JSONSchemaPropsOrArrayHolder{JSPoA: JSONSchemaPropsOrArray{Schema: &JSONSchemaProps{Type: "string"}}},
+		},
+		{
+			name:     "array props zero value",
+			input:    "\xA1\x44val1\x81\xA0",
+			expected: JSONSchemaPropsOrArrayHolder{JSPoA: JSONSchemaPropsOrArray{JSONSchemas: []JSONSchemaProps{{}}}},
+		},
+		{
+			name:     "array props zero value and props",
+			input:    "\xA1\x44val1\x82\xA0\xA1\x44type\x46string",
+			expected: JSONSchemaPropsOrArrayHolder{JSPoA: JSONSchemaPropsOrArray{JSONSchemas: []JSONSchemaProps{{}, {Type: "string"}}}},
+		},
+		{
+			name:     "omitempty props zero value",
+			input:    "\xA1\x44val2\xA0",
+			expected: JSONSchemaPropsOrArrayHolder{JSPoAOmitEmpty: &JSONSchemaPropsOrArray{Schema: &JSONSchemaProps{}}},
+		},
+		{
+			name:     "omitempty props",
+			input:    "\xA1\x44val2\xA1\x44type\x46string",
+			expected: JSONSchemaPropsOrArrayHolder{JSPoAOmitEmpty: &JSONSchemaPropsOrArray{Schema: &JSONSchemaProps{Type: "string"}}},
+		},
+		{
+			name:     "omitempty array props zero value",
+			input:    "\xA1\x44val2\x81\xA0",
+			expected: JSONSchemaPropsOrArrayHolder{JSPoAOmitEmpty: &JSONSchemaPropsOrArray{JSONSchemas: []JSONSchemaProps{{}}}},
+		},
+		{
+			name:     "omitempty array props zero value and props",
+			input:    "\xA1\x44val2\x82\xA0\xA1\x44type\x46string",
+			expected: JSONSchemaPropsOrArrayHolder{JSPoAOmitEmpty: &JSONSchemaPropsOrArray{JSONSchemas: []JSONSchemaProps{{}, {Type: "string"}}}},
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			var result JSONSchemaPropsOrArrayHolder
+			if err := cbor.Unmarshal([]byte(c.input), &result); err != nil {
+				t.Errorf("Failed to unmarshal input '%v': %v", c.input, err)
+			}
+			if !reflect.DeepEqual(result, c.expected) {
+				t.Errorf("Failed to unmarshal input %X", c.input)
+				t.Logf(cmp.Diff(c.expected, result))
+			}
+		})
+	}
+}
+
 func TestJSONSchemaPropsOrArrayMarshalJSON(t *testing.T) {
 	cases := []struct {
 		input  JSONSchemaPropsOrArrayHolder
@@ -146,5 +352,79 @@ func TestJSONSchemaPropsOrArrayMarshalJSON(t *testing.T) {
 		if string(result) != c.result {
 			t.Errorf("%d: Failed to marshal input '%v': expected: %q, got %q", i, c.input, c.result, string(result))
 		}
+	}
+}
+
+func TestJSONSchemaPropsOrArrayMarshalCBOR(t *testing.T) {
+	cases := []struct {
+		name     string
+		input    JSONSchemaPropsOrArrayHolder
+		expected string
+	}{
+		{
+			name:     "null",
+			input:    JSONSchemaPropsOrArrayHolder{},
+			expected: "\xA1\x44val1\xF6",
+		},
+		{
+			name:     "empty props",
+			input:    JSONSchemaPropsOrArrayHolder{JSPoA: JSONSchemaPropsOrArray{Schema: &JSONSchemaProps{}}},
+			expected: "\xA1\x44val1\xA0",
+		},
+		{
+			name:     "props",
+			input:    JSONSchemaPropsOrArrayHolder{JSPoA: JSONSchemaPropsOrArray{Schema: &JSONSchemaProps{Type: "string"}}},
+			expected: "\xA1\x44val1\xA1\x44type\x46string",
+		},
+		{
+			name:     "array with empty props",
+			input:    JSONSchemaPropsOrArrayHolder{JSPoA: JSONSchemaPropsOrArray{JSONSchemas: []JSONSchemaProps{{}}}},
+			expected: "\xA1\x44val1\x81\xA0",
+		},
+		{
+			name:     "array with empty props and props",
+			input:    JSONSchemaPropsOrArrayHolder{JSPoA: JSONSchemaPropsOrArray{JSONSchemas: []JSONSchemaProps{{}, {Type: "string"}}}},
+			expected: "\xA1\x44val1\x82\xA0\xA1\x44type\x46string",
+		},
+		{
+			name:     "omitempty null",
+			input:    JSONSchemaPropsOrArrayHolder{JSPoAOmitEmpty: &JSONSchemaPropsOrArray{}},
+			expected: "\xA2\x44val1\xF6\x44val2\xF6",
+		},
+		{
+			name:     "omitempty empty props",
+			input:    JSONSchemaPropsOrArrayHolder{JSPoAOmitEmpty: &JSONSchemaPropsOrArray{Schema: &JSONSchemaProps{}}},
+			expected: "\xA2\x44val1\xF6\x44val2\xA0",
+		},
+		{
+			name:     "omitempty props",
+			input:    JSONSchemaPropsOrArrayHolder{JSPoAOmitEmpty: &JSONSchemaPropsOrArray{Schema: &JSONSchemaProps{Type: "string"}}},
+			expected: "\xA2\x44val1\xF6\x44val2\xA1\x44type\x46string",
+		},
+		{
+			name:     "omitempty array with empty props",
+			input:    JSONSchemaPropsOrArrayHolder{JSPoAOmitEmpty: &JSONSchemaPropsOrArray{JSONSchemas: []JSONSchemaProps{{}}}},
+			expected: "\xA2\x44val1\xF6\x44val2\x81\xA0",
+		},
+		{
+			name:     "omitempty array with empty props and props",
+			input:    JSONSchemaPropsOrArrayHolder{JSPoAOmitEmpty: &JSONSchemaPropsOrArray{JSONSchemas: []JSONSchemaProps{{}, {Type: "string"}}}},
+			expected: "\xA2\x44val1\xF6\x44val2\x82\xA0\xA1\x44type\x46string",
+		},
+	}
+
+	for i, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			result, err := cbor.Marshal(&c.input)
+			if err != nil {
+				t.Errorf("%d: Unexpected error marshaling input '%v': %v", i, c.input, err)
+			}
+			if string(result) != c.expected {
+				t.Errorf("Failed to marshal input")
+				t.Logf("input   : %v", c.input)
+				t.Logf("expected: %X", c.expected)
+				t.Logf("actual  : %X", result)
+			}
+		})
 	}
 }
