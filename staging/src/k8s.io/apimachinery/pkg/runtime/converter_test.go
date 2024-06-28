@@ -39,6 +39,7 @@ import (
 	fuzz "github.com/google/gofuzz"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"sigs.k8s.io/structured-merge-diff/v4/value"
 )
 
 var simpleEquality = conversion.EqualitiesOrDie(
@@ -997,4 +998,21 @@ func TestCustomToUnstructuredTopLevel(t *testing.T) {
 			assert.Equal(t, expected, result)
 		})
 	}
+}
+
+type Foo struct{}
+
+var _ value.UnstructuredConverter = Foo{}
+
+func (Foo) MarshalJSON() ([]byte, error) {
+	return nil, nil
+}
+
+func (Foo) ToUnstructured() interface{} {
+	return 5
+}
+
+func TestFoo(t *testing.T) {
+	// panic: reflect.Set: value of type int is not assignable to type map[string]interface {}
+	runtime.DefaultUnstructuredConverter.ToUnstructured(&Foo{})
 }
