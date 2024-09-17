@@ -19,6 +19,7 @@ package dynamic
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"fmt"
 	"io"
 	"net/http"
@@ -177,7 +178,10 @@ func TestWatchList(t *testing.T) {
 				{Type: watch.Bookmark, Object: func() runtime.Object {
 					obj := getObject("gtest/vTest", "rTest", "item2")
 					obj.SetResourceVersion("10")
-					obj.SetAnnotations(map[string]string{metav1.InitialEventsAnnotationKey: "true"})
+					obj.SetAnnotations(map[string]string{
+						metav1.InitialEventsAnnotationKey:             "true",
+						metav1.InitialEventsEmbeddedListAnnotationKey: base64.StdEncoding.EncodeToString([]byte(`{"apiVersion":"gtest/vTest","kind":"rTestList"}`)),
+					})
 					return obj
 				}()},
 			},
@@ -189,8 +193,8 @@ func TestWatchList(t *testing.T) {
 			},
 			expectedList: &unstructured.UnstructuredList{
 				Object: map[string]interface{}{
-					"apiVersion": "",
-					"kind":       "UnstructuredList",
+					"apiVersion": "gtest/vTest",
+					"kind":       "rTestList",
 					"metadata": map[string]interface{}{
 						"resourceVersion": "10",
 					},
@@ -209,7 +213,10 @@ func TestWatchList(t *testing.T) {
 				{Type: watch.Bookmark, Object: func() runtime.Object {
 					obj := getObject("gtest/vTest", "rTest", "item2")
 					obj.SetResourceVersion("39")
-					obj.SetAnnotations(map[string]string{metav1.InitialEventsAnnotationKey: "true"})
+					obj.SetAnnotations(map[string]string{
+						metav1.InitialEventsAnnotationKey:             "true",
+						metav1.InitialEventsEmbeddedListAnnotationKey: base64.StdEncoding.EncodeToString([]byte(`{"apiVersion":"gtest/vTest","kind":"rTestList"}`)),
+					})
 					return obj
 				}()},
 			},
@@ -221,8 +228,8 @@ func TestWatchList(t *testing.T) {
 			},
 			expectedList: &unstructured.UnstructuredList{
 				Object: map[string]interface{}{
-					"apiVersion": "",
-					"kind":       "UnstructuredList",
+					"apiVersion": "gtest/vTest",
+					"kind":       "rTestList",
 					"metadata": map[string]interface{}{
 						"resourceVersion": "39",
 					},

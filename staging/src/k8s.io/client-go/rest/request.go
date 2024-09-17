@@ -796,6 +796,17 @@ func (r WatchListResult) Into(obj runtime.Object) error {
 		return r.err
 	}
 
+	initialEventsEmbeddedList, gvk, err := r.decoder.Decode(r.initialEventsRawEmbeddedList, nil, obj)
+	if err != nil {
+		return err
+	}
+	if initialEventsEmbeddedList != obj {
+		// Decode created and returned a new object instead of returning the "into"
+		// argument. Probably, the codec recognized the type of "into" but not the GVK of
+		// the list embedded in the event.
+		return fmt.Errorf("failed to decode list prototype with gvk %q into object of type %T", gvk, obj)
+	}
+
 	listItemsPtr, err := meta.GetItemsPtr(obj)
 	if err != nil {
 		return err
@@ -807,11 +818,7 @@ func (r WatchListResult) Into(obj runtime.Object) error {
 	if listVal.Kind() != reflect.Slice {
 		return fmt.Errorf("need a pointer to slice, got %v", listVal.Kind())
 	}
-	// TODO: decode to into ?
-	initialEventsEmbeddedList, _, err := r.decoder.Decode(r.initialEventsRawEmbeddedList, nil, nil)
-	if err != nil {
-		return err
-	}
+
 	listPointer := reflect.ValueOf(obj).Elem()
 	initialEventsEmbeddedListPointer := reflect.ValueOf(initialEventsEmbeddedList).Elem()
 	if listPointer.CanSet() && listPointer.Type() == initialEventsEmbeddedListPointer.Type() {
@@ -837,11 +844,6 @@ func (r WatchListResult) Into(obj runtime.Object) error {
 	listMeta.SetResourceVersion(r.initialEventsEndBookmarkRV)
 
 	return nil
-}
-
-func (r WatchListResult) WithCustomDecoder(d runtime.Decoder) WatchListResult {
-	r.decoder = d
-	return r
 }
 
 type watcherWithObjectDecoder interface {
