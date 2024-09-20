@@ -195,8 +195,8 @@ func TestWatchList(t *testing.T) {
 			},
 			expectedList: &unstructured.UnstructuredList{
 				Object: map[string]interface{}{
-					"apiVersion": "",
-					"kind":       "UnstructuredList",
+					"apiVersion": "gtest/vTest",
+					"kind":       "rTestList",
 					"metadata": map[string]interface{}{
 						"resourceVersion": "10",
 					},
@@ -227,8 +227,8 @@ func TestWatchList(t *testing.T) {
 			},
 			expectedList: &unstructured.UnstructuredList{
 				Object: map[string]interface{}{
-					"apiVersion": "",
-					"kind":       "UnstructuredList",
+					"apiVersion": "gtest/vTest",
+					"kind":       "rTestList",
 					"metadata": map[string]interface{}{
 						"resourceVersion": "39",
 					},
@@ -247,7 +247,7 @@ func TestWatchList(t *testing.T) {
 			watchResponse: []watch.Event{
 				{Type: watch.Error, Object: getObject("gtest/vTest", "rTest", "item1")},
 			},
-			listResponse: getListJSON("vTest", "UnstructuredList",
+			listResponse: getListJSON("gtest/vTest", "rTestList",
 				getJSON("gtest/vTest", "rTest", "item1"),
 				getJSON("gtest/vTest", "rTest", "item2")),
 			expectedRequestParams: []requestParam{
@@ -263,8 +263,8 @@ func TestWatchList(t *testing.T) {
 			},
 			expectedList: &unstructured.UnstructuredList{
 				Object: map[string]interface{}{
-					"apiVersion": "vTest",
-					"kind":       "UnstructuredList",
+					"apiVersion": "gtest/vTest",
+					"kind":       "rTestList",
 				},
 				Items: []unstructured.Unstructured{
 					*getObject("gtest/vTest", "rTest", "item1"),
@@ -316,7 +316,14 @@ func TestWatchList(t *testing.T) {
 			if !cmp.Equal(scenario.expectedRequestParams, actualRequestParams) {
 				t.Fatalf("unexpected request params: %v", cmp.Diff(scenario.expectedRequestParams, actualRequestParams))
 			}
-			if !cmp.Equal(scenario.expectedList, actualList) {
+
+			// TODO: Include the list GVK in this comparison as part of completing the related beta criteria (https://github.com/kubernetes/enhancements/pull/4766).
+			expectedListWithoutGVK := scenario.expectedList.DeepCopy()
+			expectedListWithoutGVK.SetGroupVersionKind(schema.GroupVersionKind{})
+			actualListWithoutGVK := actualList.DeepCopy()
+			actualListWithoutGVK.SetGroupVersionKind(schema.GroupVersionKind{})
+
+			if !cmp.Equal(expectedListWithoutGVK, actualListWithoutGVK) {
 				t.Errorf("received expected list, diff: %s", cmp.Diff(scenario.expectedList, actualList))
 			}
 		})
