@@ -61,7 +61,8 @@ type Serializer interface {
 var _ Serializer = &serializer{}
 
 type options struct {
-	strict bool
+	strict    bool
+	transcode bool
 }
 
 type Option func(*options)
@@ -69,6 +70,12 @@ type Option func(*options)
 func Strict(s bool) Option {
 	return func(opts *options) {
 		opts.strict = s
+	}
+}
+
+func Transcode(t bool) Option {
+	return func(opts *options) {
+		opts.transcode = t
 	}
 }
 
@@ -89,6 +96,7 @@ func newSerializer(metaFactory metaFactory, creater runtime.ObjectCreater, typer
 		creater:     creater,
 		typer:       typer,
 	}
+	s.options.transcode = true
 	for _, o := range options {
 		o(&s.options)
 	}
@@ -324,9 +332,10 @@ func (s *serializer) Decode(data []byte, gvk *schema.GroupVersionKind, into runt
 		return nil, actual, err
 	}
 
-	// TODO: Make possible to disable this behavior.
-	if err := transcodeRawTypes(obj); err != nil {
-		return nil, actual, err
+	if s.options.transcode {
+		if err := transcodeRawTypes(obj); err != nil {
+			return nil, actual, err
+		}
 	}
 
 	return obj, actual, strict
