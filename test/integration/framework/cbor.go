@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/client-go/dynamic"
+	kubernetesclientscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/transport"
 	aggregatorscheme "k8s.io/kube-aggregator/pkg/apiserver/scheme"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -84,6 +85,7 @@ func EnableCBORForTest(tb testing.TB) {
 		metainternalscheme.Scheme:     &metainternalscheme.Codecs,
 		aggregatorscheme.Scheme:       &aggregatorscheme.Codecs,
 		apiextensionsapiserver.Scheme: &apiextensionsapiserver.Codecs,
+		kubernetesclientscheme.Scheme: &kubernetesclientscheme.Codecs,
 	}
 
 	for scheme, factory := range codecs {
