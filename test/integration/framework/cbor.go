@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/runtime/serializer/cbor"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apiserver/pkg/endpoints"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/transport"
@@ -59,6 +60,16 @@ func EnableCBORForTest(tb testing.TB) {
 	allowed := genericapiserver.AllowedMediaTypes
 	tb.Cleanup(func() { genericapiserver.AllowedMediaTypes = allowed })
 	genericapiserver.AllowedMediaTypes = append(genericapiserver.AllowedMediaTypes, "application/cbor")
+
+	// Patch the apiextensions allowlist of patch content types.
+	crPatchTypes := apiextensionsapiserver.SupportedPatchTypes
+	tb.Cleanup(func() { apiextensionsapiserver.SupportedPatchTypes = crPatchTypes })
+	apiextensionsapiserver.SupportedPatchTypes = append(apiextensionsapiserver.SupportedPatchTypes, "application/apply-patch+cbor")
+
+	// Patch the generic apiserver allowlist of patch content types.
+	genericPatchTypes := endpoints.SupportedPatchTypes
+	tb.Cleanup(func() { endpoints.SupportedPatchTypes = genericPatchTypes })
+	endpoints.SupportedPatchTypes = append(endpoints.SupportedPatchTypes, "application/apply-patch+cbor")
 
 	// Patch construction of the codecs used to serve custom resources.
 	crExtraSerializers := apiextensionsapiserver.ExtraSerializers
