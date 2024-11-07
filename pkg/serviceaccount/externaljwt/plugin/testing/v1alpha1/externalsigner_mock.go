@@ -55,6 +55,8 @@ type MockSigner struct {
 	FetchError    error
 	MetadataError error
 	errorLock     sync.RWMutex
+
+	DelayAck chan bool
 }
 
 type KeyT struct {
@@ -72,6 +74,7 @@ func NewMockSigner(t *testing.T, socketPath string) *MockSigner {
 		server:                    server,
 		AckKeyFetch:               make(chan bool),
 		MaxTokenExpirationSeconds: 10 * 60, // 10m
+		DelayAck:                  make(chan bool),
 	}
 
 	if err := m.Reset(); err != nil {
@@ -138,6 +141,14 @@ func (m *MockSigner) FetchKeys(ctx context.Context, req *v1alpha1.FetchKeysReque
 			Key:                      k.Key,
 			ExcludeFromOidcDiscovery: k.ExcludeFromOidcDiscovery,
 		})
+	}
+
+	// The test could replace SupportedKeys and start blocking on the send to AckKeyFetch here,
+	// after FetchKeys calls Load() but before it recvs from AckKeyFetch.
+	select {
+	case <-m.DelayAck:
+		time.Sleep(time.Second)
+	default:
 	}
 
 	select {

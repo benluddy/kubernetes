@@ -178,6 +178,7 @@ func TestExternalJWTSigningAndAuth(t *testing.T) {
 					cpy[key] = value
 				}
 				cpy["kid-1"] = v1alpha1testing.KeyT{Key: pubKey1Bytes}
+				mockSigner.DelayAck <- true
 				mockSigner.SupportedKeys.Store(&cpy)
 				mockSigner.AckKeyFetch <- true
 			},
