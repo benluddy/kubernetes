@@ -266,6 +266,9 @@ func SerializerInfoForMediaType(types []SerializerInfo, mediaType string) (Seria
 		if info.MediaType == mediaType {
 			return info, true
 		}
+		if streamSerializer := info.StreamSerializer; streamSerializer != nil && streamSerializer.MediaType == mediaType {
+			return info, true
+		}
 	}
 	for _, info := range types {
 		if len(info.MediaType) == 0 {

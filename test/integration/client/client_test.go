@@ -36,6 +36,7 @@ import (
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextensionsv1client "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/api/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -1475,7 +1476,7 @@ func TestClientCBOREnablement(t *testing.T) {
 		wantRequestAccept       string
 		wantResponseContentType string
 		wantResponseStatus      int
-		wantStatusError         bool
+		wantStatusError         func(err error) bool
 		doRequest               func(t *testing.T, config *rest.Config) error
 	}
 
@@ -1489,7 +1490,6 @@ func TestClientCBOREnablement(t *testing.T) {
 			wantRequestAccept:       "application/vnd.kubernetes.protobuf,application/json",
 			wantResponseContentType: "application/vnd.kubernetes.protobuf",
 			wantResponseStatus:      http.StatusCreated,
-			wantStatusError:         false,
 			doRequest:               DoRequestWithProtobufPreferredGeneratedClient,
 		},
 		{
@@ -1501,7 +1501,6 @@ func TestClientCBOREnablement(t *testing.T) {
 			wantRequestAccept:       "application/vnd.kubernetes.protobuf,application/json",
 			wantResponseContentType: "application/vnd.kubernetes.protobuf",
 			wantResponseStatus:      http.StatusCreated,
-			wantStatusError:         false,
 			doRequest:               DoRequestWithProtobufPreferredGeneratedClient,
 		},
 		{
@@ -1513,7 +1512,6 @@ func TestClientCBOREnablement(t *testing.T) {
 			wantRequestAccept:       "application/vnd.kubernetes.protobuf,application/json",
 			wantResponseContentType: "application/vnd.kubernetes.protobuf",
 			wantResponseStatus:      http.StatusCreated,
-			wantStatusError:         false,
 			doRequest:               DoRequestWithProtobufPreferredGeneratedClient,
 		},
 		{
@@ -1525,7 +1523,6 @@ func TestClientCBOREnablement(t *testing.T) {
 			wantRequestAccept:       "application/vnd.kubernetes.protobuf,application/json",
 			wantResponseContentType: "application/vnd.kubernetes.protobuf",
 			wantResponseStatus:      http.StatusCreated,
-			wantStatusError:         false,
 			doRequest:               DoRequestWithProtobufPreferredGeneratedClient,
 		},
 		{
@@ -1537,7 +1534,6 @@ func TestClientCBOREnablement(t *testing.T) {
 			wantRequestAccept:       "application/json, */*",
 			wantResponseContentType: "application/json",
 			wantResponseStatus:      http.StatusCreated,
-			wantStatusError:         false,
 			doRequest:               DoRequestWithGeneratedClient,
 		},
 		{
@@ -1549,7 +1545,6 @@ func TestClientCBOREnablement(t *testing.T) {
 			wantRequestAccept:       "application/json, */*",
 			wantResponseContentType: "application/json",
 			wantResponseStatus:      http.StatusCreated,
-			wantStatusError:         false,
 			doRequest:               DoRequestWithGeneratedClient,
 		},
 		{
@@ -1561,7 +1556,6 @@ func TestClientCBOREnablement(t *testing.T) {
 			wantRequestAccept:       "application/json, */*",
 			wantResponseContentType: "application/json",
 			wantResponseStatus:      http.StatusCreated,
-			wantStatusError:         false,
 			doRequest:               DoRequestWithGeneratedClient,
 		},
 		{
@@ -1573,7 +1567,6 @@ func TestClientCBOREnablement(t *testing.T) {
 			wantRequestAccept:       "application/cbor, */*",
 			wantResponseContentType: "application/cbor",
 			wantResponseStatus:      http.StatusCreated,
-			wantStatusError:         false,
 			doRequest:               DoRequestWithGeneratedClient,
 		},
 		{
@@ -1585,7 +1578,7 @@ func TestClientCBOREnablement(t *testing.T) {
 			wantRequestAccept:       "application/cbor, */*",
 			wantResponseContentType: "application/json",
 			wantResponseStatus:      http.StatusUnsupportedMediaType,
-			wantStatusError:         true,
+			wantStatusError:         errors.IsUnsupportedMediaType,
 			doRequest:               DoRequestWithGeneratedClient,
 		},
 		{
@@ -1597,7 +1590,6 @@ func TestClientCBOREnablement(t *testing.T) {
 			wantRequestAccept:       "application/json, */*",
 			wantResponseContentType: "application/json",
 			wantResponseStatus:      http.StatusCreated,
-			wantStatusError:         false,
 			doRequest:               DoRequestWithGeneratedClient,
 		},
 		{
@@ -1611,7 +1603,6 @@ func TestClientCBOREnablement(t *testing.T) {
 			wantRequestAccept:       "application/cbor",
 			wantResponseContentType: "application/cbor",
 			wantResponseStatus:      http.StatusCreated,
-			wantStatusError:         false,
 			doRequest:               DoRequestWithGeneratedClient,
 		},
 		{
@@ -1625,7 +1616,6 @@ func TestClientCBOREnablement(t *testing.T) {
 			wantRequestAccept:       "application/json",
 			wantResponseContentType: "application/json",
 			wantResponseStatus:      http.StatusCreated,
-			wantStatusError:         false,
 			doRequest:               DoRequestWithGeneratedClient,
 		},
 		{
@@ -1639,7 +1629,6 @@ func TestClientCBOREnablement(t *testing.T) {
 			wantRequestAccept:       "application/cbor;q=0.9,example/foo;q=0.8",
 			wantResponseContentType: "application/cbor",
 			wantResponseStatus:      http.StatusCreated,
-			wantStatusError:         false,
 			doRequest:               DoRequestWithGeneratedClient,
 		},
 		{
@@ -1653,7 +1642,6 @@ func TestClientCBOREnablement(t *testing.T) {
 			wantRequestAccept:       "application/json; q=0.9,example/foo; q=0.8",
 			wantResponseContentType: "application/json",
 			wantResponseStatus:      http.StatusCreated,
-			wantStatusError:         false,
 			doRequest:               DoRequestWithGeneratedClient,
 		},
 		{
@@ -1667,7 +1655,6 @@ func TestClientCBOREnablement(t *testing.T) {
 			wantRequestAccept:       "application/vnd.kubernetes.protobuf;q=1,application/cbor;q=0.9,application/json;q=0.8",
 			wantResponseContentType: "application/vnd.kubernetes.protobuf",
 			wantResponseStatus:      http.StatusCreated,
-			wantStatusError:         false,
 			doRequest:               DoRequestWithGenericTypedClient,
 		},
 		{
@@ -1681,7 +1668,20 @@ func TestClientCBOREnablement(t *testing.T) {
 			wantRequestAccept:       "application/cbor;q=1,application/json;q=0.9",
 			wantResponseContentType: "application/cbor",
 			wantResponseStatus:      http.StatusCreated,
-			wantStatusError:         false,
+			doRequest:               DoRequestWithGenericTypedClient,
+		},
+		{
+			name:                    "generated client accept cbor-seq get 406",
+			served:                  true,
+			allowed:                 true,
+			preferred:               false,
+			configuredContentType:   "application/json",
+			configuredAccept:        "application/cbor-seq",
+			wantRequestContentType:  "application/json",
+			wantRequestAccept:       "application/cbor-seq",
+			wantResponseContentType: "application/json",
+			wantResponseStatus:      http.StatusNotAcceptable,
+			wantStatusError:         errors.IsNotAcceptable,
 			doRequest:               DoRequestWithGenericTypedClient,
 		},
 		{
@@ -1695,7 +1695,6 @@ func TestClientCBOREnablement(t *testing.T) {
 			wantRequestAccept:       "application/cbor;q=1,application/json;q=0.9",
 			wantResponseContentType: "application/cbor-seq",
 			wantResponseStatus:      http.StatusOK,
-			wantStatusError:         false,
 			doRequest:               DoWatchRequestWithGenericTypedClient,
 		},
 		{
@@ -1709,7 +1708,6 @@ func TestClientCBOREnablement(t *testing.T) {
 			wantRequestAccept:       "application/cbor;q=1,application/json;q=0.9",
 			wantResponseContentType: "application/json",
 			wantResponseStatus:      http.StatusCreated,
-			wantStatusError:         false,
 			doRequest:               DoRequestWithGenericTypedClient,
 		},
 		{
@@ -1723,7 +1721,6 @@ func TestClientCBOREnablement(t *testing.T) {
 			wantRequestAccept:       "application/cbor;q=0.9,application/json;q=1",
 			wantResponseContentType: "application/json",
 			wantResponseStatus:      http.StatusCreated,
-			wantStatusError:         false,
 			doRequest:               DoRequestWithGenericTypedClient,
 		},
 	}
@@ -1831,9 +1828,9 @@ func TestClientCBOREnablement(t *testing.T) {
 
 					err := tc.doRequest(t, config)
 					switch {
-					case tc.wantStatusError && apierrors.IsUnsupportedMediaType(err):
+					case tc.wantStatusError == nil && err == nil:
 						// ok
-					case !tc.wantStatusError && err == nil:
+					case tc.wantStatusError != nil && tc.wantStatusError(err):
 						// ok
 					default:
 						t.Errorf("unexpected error: %v", err)

@@ -62,6 +62,7 @@ func newBasicNegotiatedSerializer() basicNegotiatedSerializer {
 			StreamSerializer: &runtime.StreamSerializerInfo{
 				Serializer: cbor.NewSerializer(basicScheme, basicScheme, cbor.Transcode(false)),
 				Framer:     cbor.NewFramer(),
+				MediaType:  "application/cbor-seq",
 			},
 		})
 	}

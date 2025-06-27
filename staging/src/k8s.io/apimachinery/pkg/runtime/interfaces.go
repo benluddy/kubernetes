@@ -172,6 +172,10 @@ type StreamSerializerInfo struct {
 	Serializer
 	// Framer is the factory for retrieving streams that separate objects on the wire
 	Framer
+	// MediaType is the media type (type/subtype) identifying streams produced or consumed by
+	// this serializer. If empty, streams share the media type of the corresponding non-stream
+	// serializer and are distinguished from non-stream content by media type parameters.
+	MediaType string
 }
 
 // NegotiatedSerializer is an interface used for obtaining encoders, decoders, and serializers

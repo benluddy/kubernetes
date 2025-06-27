@@ -384,6 +384,7 @@ func NewSerializerInfo(creater runtime.ObjectCreater, typer runtime.ObjectTyper)
 		StreamSerializer: &runtime.StreamSerializerInfo{
 			Framer:     NewFramer(),
 			Serializer: NewSerializer(creater, typer, Transcode(false)),
+			MediaType:  "application/cbor-seq",
 		},
 	}
 }
