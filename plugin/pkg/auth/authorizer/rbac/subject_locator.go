@@ -121,5 +121,5 @@ func (r *SubjectAccessEvaluator) AllowedSubjects(ctx context.Context, requestAtt
 		}
 	}
 
-	return subjects, utilerrors.NewAggregate(errorlist)
+	return dedupedSubjects, utilerrors.NewAggregate(errorlist)
 }

@@ -135,6 +135,28 @@ func TestSubjectLocator(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "duplicate subjects are removed",
+			clusterRoles: []*rbacv1.ClusterRole{
+				newClusterRole("admin", newRule("*", "*", "*", "*")),
+			},
+			clusterRoleBindings: []*rbacv1.ClusterRoleBinding{
+				newClusterRoleBinding("admin", "User:admin", "Group:admins"),
+			},
+			roleBindings: []*rbacv1.RoleBinding{
+				newRoleBinding("ns1", "admin", bindToClusterRole, "User:admin", "Group:admins"),
+			},
+			actionsToSubjects: []actionToSubjects{
+				{
+					&defaultAttributes{"", "", "get", "Pods", "", "ns1", ""},
+					[]rbacv1.Subject{
+						{Kind: rbacv1.GroupKind, APIGroup: rbacv1.GroupName, Name: user.SystemPrivilegedGroup},
+						{Kind: rbacv1.UserKind, APIGroup: rbacv1.GroupName, Name: "admin"},
+						{Kind: rbacv1.GroupKind, APIGroup: rbacv1.GroupName, Name: "admins"},
+					},
+				},
+			},
+		},
 	}
 	for _, tt := range tests {
 		ruleResolver, lister := rbacregistryvalidation.NewTestRuleResolver(tt.roles, tt.roleBindings, tt.clusterRoles, tt.clusterRoleBindings)
