@@ -75,8 +75,20 @@ type ResourceGVK struct {
 }
 
 func (r ResourceGVK) KindForGroupVersionKinds(kinds []schema.GroupVersionKind) (schema.GroupVersionKind, bool) {
+	listKind := r.ListKind
+	if listKind.Empty() {
+		// Fall back to the <Kind>List convention. Every built-in follows it and
+		// apiextensions defaults spec.names.listKind to it, so deriving it here
+		// disambiguates list responses for resources that do not implement
+		// GroupVersionListKindProvider -- which is every resource today.
+		//
+		// This cannot regress a resource whose list kind is not <Kind>List: the
+		// derived kind simply will not appear among kinds, the exact-match loop
+		// will not fire, and the fallbacks below apply exactly as before.
+		listKind = r.Kind.GroupVersion().WithKind(r.Kind.Kind + "List")
+	}
 	for _, k := range kinds {
-		if k == r.Kind || (!r.ListKind.Empty() && k == r.ListKind) {
+		if k == r.Kind || k == listKind {
 			return k, true
 		}
 	}
